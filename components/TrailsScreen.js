@@ -1,11 +1,12 @@
 import React, { useState, useEffect } from 'react';
 import { 
   View, Text, FlatList, TouchableOpacity, Image, 
-  StyleSheet, ActivityIndicator, TextInput 
+  StyleSheet, ActivityIndicator, TextInput, Modal 
 } from 'react-native';
 import { getTrails, getTopRatedTrails } from '../firebase/firestoreService';
-import { Ionicons } from '@expo/vector-icons';
+import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import StarRating from './StarRating';
+import { Button, Portal, Surface, Title, IconButton } from 'react-native-paper';
 
 const TrailsScreen = ({ navigation, setActiveScreen }) => {
   const [trails, setTrails] = useState([]);
@@ -13,6 +14,10 @@ const TrailsScreen = ({ navigation, setActiveScreen }) => {
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
   const [filter, setFilter] = useState('all'); // 'all', 'easy', 'moderate', 'difficult'
+  const [ratingModalVisible, setRatingModalVisible] = useState(false);
+  const [userRating, setUserRating] = useState(0);
+  const [submitting, setSubmitting] = useState(false);
+  const [selectedTrail, setSelectedTrail] = useState(null);
 
   useEffect(() => {
     const fetchTrails = async () => {
@@ -43,10 +48,29 @@ const TrailsScreen = ({ navigation, setActiveScreen }) => {
   });
 
   const handleTrailPress = (trail) => {
-    // We'll create this screen later
-    setActiveScreen('TrailDetail');
-    // Pass the trail ID to the detail screen
-    // (You'll need to adapt this to your navigation system)
+    setSelectedTrail(trail);
+    setRatingModalVisible(true);
+  };
+
+  const showRatingModal = () => setRatingModalVisible(true);
+  const hideRatingModal = () => {
+    setRatingModalVisible(false);
+    setUserRating(0);
+  };
+
+  const handleRatingPress = (rating) => setUserRating(rating);
+
+  const submitRating = async () => {
+    setSubmitting(true);
+    try {
+      // Submit the rating logic here
+      console.log(`Submitting rating ${userRating} for trail ${selectedTrail.name}`);
+    } catch (error) {
+      console.error('Error submitting rating:', error);
+    } finally {
+      setSubmitting(false);
+      hideRatingModal();
+    }
   };
 
   const renderTrailItem = ({ item }) => (
@@ -178,6 +202,63 @@ const TrailsScreen = ({ navigation, setActiveScreen }) => {
           <Text style={styles.emptyText}>No trails found. Try a different search.</Text>
         }
       />
+
+      <Portal>
+        <Modal
+          visible={ratingModalVisible}
+          onDismiss={hideRatingModal}
+          contentContainerStyle={styles.modalContainer}
+        >
+          <Surface style={styles.ratingModalContent}>
+            <IconButton
+              icon="close"
+              size={24}
+              style={styles.closeButton}
+              onPress={hideRatingModal}
+            />
+            
+            <Title style={styles.ratingModalTitle}>Rate this Trail</Title>
+            <Image 
+              source={{ uri: selectedTrail?.imageUrl || 'https://via.placeholder.com/400x200?text=No+Image' }}
+              style={styles.ratingModalImage}
+              resizeMode="cover"
+            />
+            
+            <Text style={styles.ratingModalTrailName}>{selectedTrail?.name}</Text>
+            <Text style={styles.ratingModalInstructions}>Tap a star to rate</Text>
+            
+            <View style={styles.ratingStarsContainer}>
+              {[1, 2, 3, 4, 5].map((star) => (
+                <TouchableOpacity
+                  key={star}
+                  onPress={() => handleRatingPress(star)}
+                  style={styles.ratingStarButton}
+                >
+                  <MaterialCommunityIcons
+                    name={userRating >= star ? "star" : "star-outline"}
+                    size={36}
+                    color={userRating >= star ? "#FFD700" : "#ccc"}
+                  />
+                </TouchableOpacity>
+              ))}
+            </View>
+            
+            <Text style={styles.selectedRatingText}>
+              {userRating > 0 ? `Your rating: ${userRating}/5` : "Select a rating"}
+            </Text>
+            
+            <Button 
+              mode="contained" 
+              onPress={submitRating}
+              loading={submitting}
+              disabled={submitting || userRating === 0}
+              style={styles.submitButton}
+            >
+              Submit Rating
+            </Button>
+          </Surface>
+        </Modal>
+      </Portal>
     </View>
   );
 };
@@ -354,6 +435,55 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     marginTop: 20,
     color: '#666',
+  },
+  modalContainer: {
+    padding: 20,
+    backgroundColor: '#fff',
+    marginHorizontal: 20,
+    borderRadius: 8,
+  },
+  ratingModalContent: {
+    padding: 20,
+    alignItems: 'center',
+  },
+  closeButton: {
+    alignSelf: 'flex-end',
+  },
+  ratingModalTitle: {
+    fontSize: 20,
+    fontWeight: 'bold',
+    marginBottom: 10,
+  },
+  ratingModalImage: {
+    width: '100%',
+    height: 200,
+    borderRadius: 8,
+    marginBottom: 10,
+  },
+  ratingModalTrailName: {
+    fontSize: 16,
+    fontWeight: 'bold',
+    marginBottom: 10,
+  },
+  ratingModalInstructions: {
+    fontSize: 14,
+    color: '#666',
+    marginBottom: 10,
+  },
+  ratingStarsContainer: {
+    flexDirection: 'row',
+    marginBottom: 10,
+  },
+  ratingStarButton: {
+    marginHorizontal: 5,
+  },
+  selectedRatingText: {
+    fontSize: 14,
+    color: '#666',
+    marginBottom: 10,
+  },
+  submitButton: {
+    marginTop: 10,
   },
 });
 

@@ -1,50 +1,109 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect } from 'react';
 import { 
   View, 
-  Text, 
   StyleSheet, 
-  TouchableOpacity, 
   Alert, 
   FlatList, 
-  Image,
-  ImageBackground,
   ScrollView,
-  ActivityIndicator,
-  Dimensions
+  StatusBar,
+  Dimensions,
+  ImageBackground,
+  TouchableOpacity,
+  Image
 } from 'react-native';
+import { 
+  Button, 
+  Card, 
+  Title, 
+  Paragraph, 
+  ActivityIndicator,
+  Divider,
+  Text,
+  Chip,
+  Avatar,
+  Surface,
+  Caption,
+  Subheading,
+  Banner,
+  FAB,
+  IconButton,
+  useTheme
+} from 'react-native-paper';
 import { seedTrails } from '../firebase/seedTrails';
 import { getTrails } from '../firebase/firestoreService';
-import { Ionicons } from '@expo/vector-icons';
-import StarRating from './StarRating';
+import { MaterialCommunityIcons } from '@expo/vector-icons';
 import TrailCard from './TrailCard';
+
+// Import local assets for easier management
+const ASSETS = {
+  // Hero and general images
+  hero: require('../assets/images/spot3.webp'),
+  logo: require('../assets/images/logo2.png'),
+  cebuIcon: require('../assets/images/spot2.webp'),
+  aboutImage: require('../assets/images/spot1.webp'),
+  
+  // Individual spot images - replace with your actual images
+  spot1: require('../assets/images/spot1.webp'),
+  spot2: require('../assets/images/spot2.webp'),
+  spot3: require('../assets/images/spot1.webp'),
+  spot4: require('../assets/images/spot2.webp'),
+  spot5: require('../assets/images/spot1.webp'),
+  spot6: require('../assets/images/spot2.webp'),
+  spot7: require('../assets/images/spot1.webp'),
+  spot8: require('../assets/images/spot2.webp'),
+};
+
+// Mapping of trail IDs to specific spot images
+// You'll need to update these IDs with your actual trail IDs from Firebase
+const TRAIL_IMAGES = {
+  '': ASSETS.spot1,
+  '../assets/images/spot1.webp': ASSETS.spot2,
+  'trail3': ASSETS.spot3,
+  'trail4': ASSETS.spot4,
+  'trail5': ASSETS.spot5,
+  'trail6': ASSETS.spot6,
+  'trail7': ASSETS.spot7,
+  'trail8': ASSETS.spot8,
+  // Add more as needed
+};
+
+// Cebu hiking facts
+const CEBU_FACTS = [
+  "Cebu's mountainous topography provides diverse hiking landscapes",
+  "The island's peaks offer panoramic views of nearby islands",
+  "Cebu has trails suitable for both beginners and experienced hikers",
+  "Many trails feature cultural and historical landmarks",
+  "The tropical climate enables year-round hiking possibilities"
+];
 
 const { width } = Dimensions.get('window');
 
-// Carousel images - replace with your own images if needed
-const carouselImages = [
-  { 
-    id: '1',
-    image: 'https://dynamic-media-cdn.tripadvisor.com/media/photo-o/17/f8/61/85/received-2413139085598046.jpg?w=1200&h=1200&s=1',
-    title: "Discover Cebu's Peaks"
-  },
-  { 
-    id: '2',
-    image: 'https://steemitimages.com/DQmWvrxEyGBCvYrssGAc2AGfgkWJwTvJ9tpvYRQU4Ku1MMo/IMG_20180127_053224.jpg',
-    title: "Breathtaking Mountain Views"
-  },
-  { 
-    id: '3',
-    image: 'https://i.pinimg.com/originals/7e/a0/73/7ea0731c0041387c0c59f33faeecb225.jpg',
-    title: "Adventure Awaits You"
-  }
-];
-
-const HomeScreen = ({ setActiveScreen, setSelectedTrailId }) => {
+const HomeScreen = ({ setActiveScreen, setSelectedTrailId, currentUser }) => {
+  const theme = useTheme();
   const [featuredTrails, setFeaturedTrails] = useState([]);
   const [spotlightTrail, setSpotlightTrail] = useState(null);
   const [loading, setLoading] = useState(true);
-  const [activeCarouselIndex, setActiveCarouselIndex] = useState(0);
-  const carouselRef = useRef(null);
+  const [visible, setVisible] = useState(true);
+  const [activeFact, setActiveFact] = useState(0);
+
+  // Cycle through Cebu facts
+  useEffect(() => {
+    const factInterval = setInterval(() => {
+      setActiveFact((prev) => (prev + 1) % CEBU_FACTS.length);
+    }, 5000);
+    
+    return () => clearInterval(factInterval);
+  }, []);
+
+  // Get image for a specific trail - use local asset if available, otherwise use trail's imageUrl
+  const getTrailImage = (trail) => {
+    if (TRAIL_IMAGES[trail.id]) {
+      return TRAIL_IMAGES[trail.id];
+    }
+    
+    // If no matching ID, use default image or trail's imageUrl
+    return { uri: trail.imageUrl || '../assets/images/spot2.webp' };
+  };
 
   useEffect(() => {
     const fetchTrails = async () => {
@@ -72,21 +131,7 @@ const HomeScreen = ({ setActiveScreen, setSelectedTrailId }) => {
     };
 
     fetchTrails();
-    
-    // Auto-scroll carousel
-    const carouselInterval = setInterval(() => {
-      if (carouselRef.current) {
-        const nextIndex = (activeCarouselIndex + 1) % carouselImages.length;
-        carouselRef.current.scrollToIndex({
-          index: nextIndex,
-          animated: true
-        });
-        setActiveCarouselIndex(nextIndex);
-      }
-    }, 5000);
-    
-    return () => clearInterval(carouselInterval);
-  }, [activeCarouselIndex]);
+  }, []);
 
   const handleSeedTrails = async () => {
     try {
@@ -103,207 +148,277 @@ const HomeScreen = ({ setActiveScreen, setSelectedTrailId }) => {
     setActiveScreen('TrailDetail');
   };
 
-  const renderTrailItem = ({ item }) => (
-    <TrailCard 
-      trail={item} 
-      onPress={() => handleTrailPress(item.id)} 
-    />
-  );
-
-  const renderCarouselItem = ({ item, index }) => (
-    <View style={styles.carouselItemContainer}>
-      <ImageBackground 
-        source={{ uri: item.image }}
-        style={styles.carouselImage}
-      >
-        <View style={styles.carouselOverlay}>
-          <Text style={styles.carouselTitle}>{item.title}</Text>
-          
-          {index === 1 && (
-            <Text style={styles.carouselTagline}>
-              Your guide to the most scenic trails in Cebu
-            </Text>
-          )}
-          
-          {index === 0 && (
-            <TouchableOpacity 
-              style={styles.carouselButton}
-              onPress={() => setActiveScreen('Trails')}
-            >
-              <Text style={styles.carouselButtonText}>Explore Trails</Text>
-            </TouchableOpacity>
-          )}
-          
-          {index === 2 && (
-            <View style={styles.carouselTags}>
-              <View style={styles.carouselTag}>
-                <Text style={styles.carouselTagText}>Hiking</Text>
-              </View>
-              <View style={styles.carouselTag}>
-                <Text style={styles.carouselTagText}>Adventure</Text>
-              </View>
-              <View style={styles.carouselTag}>
-                <Text style={styles.carouselTagText}>Nature</Text>
-              </View>
-            </View>
-          )}
+  // Simple Trail Card without rating functionality
+  const SimpleTrailCard = ({ trail }) => (
+    <Card style={styles.customTrailCard} onPress={() => handleTrailPress(trail.id)}>
+      <Image 
+        source={getTrailImage(trail)} 
+        style={styles.customTrailImage} 
+        resizeMode="cover"
+      />
+      
+      <Card.Content style={styles.customTrailContent}>
+        <Title style={styles.customTrailTitle} numberOfLines={1}>{trail.name}</Title>
+        
+        <View style={styles.customTrailInfoRow}>
+          <MaterialCommunityIcons name="map-marker" size={16} color="#666" />
+          <Text style={styles.customTrailInfoText} numberOfLines={1}>{trail.location}</Text>
         </View>
-      </ImageBackground>
-    </View>
-  );
-
-  const renderCarouselDot = (index) => (
-    <View 
-      key={index}
-      style={[
-        styles.carouselDot,
-        activeCarouselIndex === index && styles.carouselDotActive
-      ]} 
-    />
+        
+        <View style={styles.customTrailInfoRow}>
+          <View 
+            style={[
+              styles.difficultyBadge,
+              trail.difficulty.toLowerCase() === 'easy' ? styles.easyBadge : 
+              trail.difficulty.toLowerCase() === 'moderate' ? styles.moderateBadge : 
+              styles.difficultBadge
+            ]}
+          >
+            <Text style={styles.difficultyText}>{trail.difficulty}</Text>
+          </View>
+          
+          <View style={styles.trailMetaContainer}>
+            <View style={styles.metaItem}>
+              <MaterialCommunityIcons name="map-marker-distance" size={14} color="#666" />
+              <Text style={styles.metaText}>{trail.distance} km</Text>
+            </View>
+            
+            <View style={styles.metaItem}>
+              <MaterialCommunityIcons name="clock-outline" size={14} color="#666" />
+              <Text style={styles.metaText}>{trail.estimatedTime}</Text>
+            </View>
+          </View>
+        </View>
+      </Card.Content>
+    </Card>
   );
 
   if (loading) {
     return (
-      <View style={styles.loadingContainer}>
-        <ActivityIndicator size="large" color="#3c6e71" />
-        <Text style={styles.loadingText}>Loading hiking trails...</Text>
+      <View style={[styles.loadingContainer, { backgroundColor: theme.colors.background }]}>
+        <Image source={ASSETS.logo} style={styles.loadingLogo} />
+        <ActivityIndicator size="large" color={theme.colors.primary} />
+        <Text style={styles.loadingText}>Loading Cebu's hiking destinations...</Text>
       </View>
     );
   }
 
   return (
-    <ScrollView style={styles.container} showsVerticalScrollIndicator={false}>
-      {/* Header Carousel */}
-      <View style={styles.carouselContainer}>
-        <FlatList
-          ref={carouselRef}
-          data={carouselImages}
-          renderItem={renderCarouselItem}
-          keyExtractor={(item) => item.id}
-          horizontal
-          pagingEnabled
-          showsHorizontalScrollIndicator={false}
-          onMomentumScrollEnd={(event) => {
-            const index = Math.floor(
-              event.nativeEvent.contentOffset.x / width
-            );
-            setActiveCarouselIndex(index);
-          }}
-        />
-        <View style={styles.carouselDotsContainer}>
-          {carouselImages.map((_, index) => renderCarouselDot(index))}
-        </View>
-      </View>
-      
-      {/* Main tagline under carousel */}
-      <View style={styles.taglineContainer}>
-        <Text style={styles.tagline}>
-          Explore the beautiful mountains and trails of Cebu Island
-        </Text>
-        <View style={styles.taglineDivider} />
-      </View>
-      
-      {/* Quick Stats */}
-      <View style={styles.statsContainer}>
-        <View style={styles.statItem}>
-          <Ionicons name="flag" size={24} color="#3c6e71" />
-          <Text style={styles.statNumber}>{featuredTrails.length + (spotlightTrail ? 1 : 0)}</Text>
-          <Text style={styles.statLabel}>Trails</Text>
-        </View>
-        <View style={styles.statDivider} />
-        <View style={styles.statItem}>
-          <Ionicons name="map" size={24} color="#3c6e71" />
-          <Text style={styles.statNumber}>Cebu</Text>
-          <Text style={styles.statLabel}>Location</Text>
-        </View>
-        <View style={styles.statDivider} />
-        <View style={styles.statItem}>
-          <Ionicons name="compass" size={24} color="#3c6e71" />
-          <Text style={styles.statNumber}>All</Text>
-          <Text style={styles.statLabel}>Levels</Text>
-        </View>
-      </View>
-
-      {/* Spotlight Trail */}
-      {spotlightTrail && (
-        <View style={styles.spotlightContainer}>
-          <Text style={styles.sectionTitle}>Spotlight Trail</Text>
-          <TouchableOpacity
-            style={styles.spotlightCard}
-            onPress={() => handleTrailPress(spotlightTrail.id)}
-            activeOpacity={0.9}
-          >
-            <ImageBackground
-              source={{ uri: spotlightTrail.imageUrl }}
-              style={styles.spotlightImage}
-              imageStyle={{ borderRadius: 16 }}
+    <>
+      <StatusBar barStyle="light-content" backgroundColor="#2E5F60" />
+      <ScrollView 
+        style={styles.container} 
+        showsVerticalScrollIndicator={false}
+      >
+        {/* Hero Header */}
+        <ImageBackground
+          source={ASSETS.hero}
+          style={styles.heroBackground}
+        >
+          <View style={styles.heroOverlay}>
+            <Image source={ASSETS.logo} style={styles.logoImage} />
+            <Title style={styles.heroTitle}>CEBU HIKING TRAILS</Title>
+            <Text style={styles.heroSubtitle}>Explore the Queen City's Natural Wonders</Text>
+            <Button 
+              mode="contained" 
+              onPress={() => setActiveScreen('Trails')}
+              style={styles.heroButton}
+              icon={({size, color}) => (
+                <MaterialCommunityIcons name="hiking" size={size} color={color} />
+              )}
             >
-              <View style={styles.spotlightOverlay}>
-                <View style={styles.spotlightContent}>
-                  <Text style={styles.spotlightName}>{spotlightTrail.name}</Text>
-                  <Text style={styles.spotlightLocation}>{spotlightTrail.location}</Text>
-                  <View style={styles.spotlightRating}>
-                    <StarRating rating={spotlightTrail.averageRating || 0} size={16} />
-                    <Text style={styles.spotlightRatingText}>
-                      {spotlightTrail.averageRating ? spotlightTrail.averageRating.toFixed(1) : 'No ratings'}
-                    </Text>
-                  </View>
-                  <View style={[
-                    styles.spotlightBadge,
-                    spotlightTrail.difficulty.toLowerCase() === 'easy' ? styles.easyBadge :
-                    spotlightTrail.difficulty.toLowerCase() === 'moderate' ? styles.moderateBadge :
-                    styles.difficultBadge
-                  ]}>
-                    <Text style={styles.spotlightBadgeText}>{spotlightTrail.difficulty}</Text>
+              DISCOVER TRAILS
+            </Button>
+          </View>
+        </ImageBackground>
+
+        {/* Rotating Facts */}
+        <Surface style={styles.factContainer}>
+          <View style={styles.factIconContainer}>
+            <MaterialCommunityIcons name="information" size={24} color={theme.colors.primary} />
+          </View>
+          <Text style={styles.factText}>{CEBU_FACTS[activeFact]}</Text>
+        </Surface>
+
+        {/* Stats Section */}
+        <Surface style={styles.statsContainer}>
+          <View style={styles.statsHeader}>
+            <Image source={ASSETS.cebuIcon} style={styles.cebuIcon} />
+            <View style={styles.statsHeaderText}>
+              <Title style={styles.statsTitle}>Cebu Island</Title>
+              <Caption style={styles.statsSubtitle}>Hiking Destination</Caption>
+            </View>
+          </View>
+          <Divider style={styles.statsDivider} />
+          <View style={styles.statsRow}>
+            <View style={styles.statItem}>
+              <MaterialCommunityIcons name="pine-tree" size={24} color={theme.colors.primary} />
+              <Title style={styles.statNumber}>{featuredTrails.length + (spotlightTrail ? 1 : 0)}</Title>
+              <Caption style={styles.statLabel}>Trails</Caption>
+            </View>
+            
+            <View style={styles.statDivider} />
+            
+            <View style={styles.statItem}>
+              <MaterialCommunityIcons name="map-marker-radius" size={24} color={theme.colors.primary} />
+              <Title style={styles.statNumber}>Central</Title>
+              <Caption style={styles.statLabel}>Visayas</Caption>
+            </View>
+            
+            <View style={styles.statDivider} />
+            
+            <View style={styles.statItem}>
+              <MaterialCommunityIcons name="terrain" size={24} color={theme.colors.primary} />
+              <Title style={styles.statNumber}>1,013m</Title>
+              <Caption style={styles.statLabel}>Highest</Caption>
+            </View>
+          </View>
+        </Surface>
+
+        {/* Why Cebu Section */}
+        <View style={styles.whyCebuContainer}>
+          <View style={styles.sectionHeader}>
+            <Title style={styles.sectionTitle}>Why Hike in Cebu?</Title>
+            <Divider style={styles.sectionDivider} />
+          </View>
+          
+          <Card style={styles.whyCebuCard}>
+            <Card.Cover source={ASSETS.aboutImage} style={styles.whyCebuImage} />
+            <Card.Content style={styles.whyCebuContent}>
+              <Paragraph style={styles.whyCebuText}>
+                Cebu Island offers diverse hiking experiences with its unique limestone cliffs, 
+                tropical forests, and stunning mountain ridges. From the famous Osmeña Peak to 
+                the challenging trails of Mt. Manunggal, hikers can enjoy breathtaking 
+                panoramic views of the surrounding islands and seas.
+              </Paragraph>
+              <Paragraph style={styles.whyCebuText}>
+                The island's rich biodiversity, cultural heritage, and year-round 
+                accessibility make it a premier hiking destination in the Philippines.
+                Many trails feature natural springs, waterfalls, and historical landmarks.
+              </Paragraph>
+              <Button 
+                mode="outlined" 
+                onPress={() => setActiveScreen('About')}
+                style={styles.whyCebuButton}
+                icon="information-outline"
+              >
+                Learn More About Cebu
+              </Button>
+            </Card.Content>
+          </Card>
+        </View>
+
+        {/* Spotlight Trail - With Custom Local Image */}
+        {spotlightTrail && (
+          <View style={styles.spotlightContainer}>
+            <View style={styles.sectionHeader}>
+              <Title style={styles.sectionTitle}>Featured Destination</Title>
+              <Divider style={styles.sectionDivider} />
+            </View>
+            
+            <Card style={styles.spotlightCard} onPress={() => handleTrailPress(spotlightTrail.id)}>
+              <ImageBackground 
+                source={getTrailImage(spotlightTrail)} 
+                style={styles.spotlightBackground}
+              >
+                <View style={styles.spotlightGradient}>
+                  <View style={styles.spotlightContent}>
+                    <View style={styles.spotlightHeader}>
+                      <Title style={styles.spotlightTitle}>{spotlightTrail.name}</Title>
+                      <View 
+                        style={[
+                          styles.difficultyBadge,
+                          spotlightTrail.difficulty.toLowerCase() === 'easy' ? styles.easyBadge : 
+                          spotlightTrail.difficulty.toLowerCase() === 'moderate' ? styles.moderateBadge : 
+                          styles.difficultBadge
+                        ]}
+                      >
+                        <Text style={styles.difficultyText}>{spotlightTrail.difficulty}</Text>
+                      </View>
+                    </View>
+                    
+                    <View style={styles.spotlightDetails}>
+                      <View style={styles.spotlightDetail}>
+                        <MaterialCommunityIcons name="map-marker" size={16} color="#fff" />
+                        <Text style={styles.spotlightDetailText}>{spotlightTrail.location}</Text>
+                      </View>
+                      
+                      <View style={styles.spotlightDetail}>
+                        <MaterialCommunityIcons name="map-marker-distance" size={16} color="#fff" />
+                        <Text style={styles.spotlightDetailText}>{spotlightTrail.distance} km</Text>
+                      </View>
+                      
+                      <View style={styles.spotlightDetail}>
+                        <MaterialCommunityIcons name="clock-outline" size={16} color="#fff" />
+                        <Text style={styles.spotlightDetailText}>{spotlightTrail.estimatedTime}</Text>
+                      </View>
+                    </View>
+                    
+                    <Paragraph style={styles.spotlightDescription} numberOfLines={2}>
+                      {spotlightTrail.description}
+                    </Paragraph>
+                    
+                    <Button 
+                      mode="contained" 
+                      onPress={() => handleTrailPress(spotlightTrail.id)}
+                      style={styles.spotlightButton}
+                      icon="arrow-right"
+                    >
+                      Explore This Trail
+                    </Button>
                   </View>
                 </View>
-              </View>
-            </ImageBackground>
-          </TouchableOpacity>
-        </View>
-      )}
+              </ImageBackground>
+            </Card>
+          </View>
+        )}
 
-      {/* Featured Trails */}
-      {featuredTrails.length > 0 && (
-        <View style={styles.featuredContainer}>
-          <Text style={styles.sectionTitle}>Featured Trails</Text>
-          <FlatList
-            data={featuredTrails}
-            renderItem={renderTrailItem}
-            keyExtractor={(item) => item.id}
-            contentContainerStyle={styles.trailsList}
-            scrollEnabled={false} // Disable scroll since we're in a ScrollView
-          />
-        </View>
-      )}
+        {/* More Trails Section - With Simple Cards */}
+        {featuredTrails.length > 0 && (
+          <View style={styles.moreTrailsContainer}>
+            <View style={styles.sectionHeader}>
+              <Title style={styles.sectionTitle}>More Trails to Explore</Title>
+              <Button 
+                mode="text" 
+                onPress={() => setActiveScreen('Trails')}
+                icon="chevron-right"
+                style={styles.viewAllButton}
+              >
+                View All
+              </Button>
+            </View>
+            <Divider style={styles.sectionDivider} />
+            
+            <View style={styles.customTrailsGrid}>
+              {featuredTrails.map((trail) => (
+                <SimpleTrailCard key={trail.id} trail={trail} />
+              ))}
+            </View>
+          </View>
+        )}
+        
+        {/* Admin button - only visible for admin */}
+        {currentUser?.isAdmin && (
+          <Button 
+            mode="outlined" 
+            onPress={handleSeedTrails}
+            style={styles.adminButton}
+            icon="database-plus"
+          >
+            Initialize Trail Data
+          </Button>
+        )}
+      </ScrollView>
       
-      {/* View All Button */}
-      <TouchableOpacity 
-        style={styles.viewAllButton}
+      {/* Floating Action Button */}
+      <FAB
+        style={[styles.fab, { backgroundColor: theme.colors.primary }]}
+        icon="compass"
+        label="Explore"
         onPress={() => setActiveScreen('Trails')}
-      >
-        <Text style={styles.viewAllButtonText}>View All Hiking Trails</Text>
-        <Ionicons name="arrow-forward" size={18} color="#fff" />
-      </TouchableOpacity>
-      
-      {/* App Description */}
-      <View style={styles.aboutContainer}>
-        <Text style={styles.aboutTitle}>About Cebu Hiking Spots</Text>
-        <Text style={styles.aboutText}>
-          Explore the beautiful mountains and trails of Cebu Island with our comprehensive 
-          guide to the best hiking spots. Get information on trail difficulty, estimated 
-          hiking time, and trail conditions to plan your perfect outdoor adventure.
-        </Text>
-      </View>
-      
-      {/* Admin button - hidden for regular users */}
-      <TouchableOpacity 
-        style={styles.adminButton}
-        onPress={handleSeedTrails}
-      >
-        <Text style={styles.adminButtonText}>Initialize Trail Data</Text>
-      </TouchableOpacity>
-    </ScrollView>
+        color="#fff"
+      />
+    </>
   );
 };
 
@@ -316,214 +431,220 @@ const styles = StyleSheet.create({
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
+    padding: 20,
+  },
+  loadingLogo: {
+    width: 100,
+    height: 100,
+    marginBottom: 20,
+    resizeMode: 'contain',
   },
   loadingText: {
-    marginTop: 10,
+    marginTop: 16,
     fontSize: 16,
     color: '#666',
   },
-  // Header Carousel
-  carouselContainer: {
-    height: 250,
+  // Hero Header
+  heroBackground: {
+    height: 380,
     width: '100%',
   },
-  carouselItemContainer: {
-    width: width,
-    height: 250,
-  },
-  carouselImage: {
-    width: '100%',
+  heroOverlay: {
+    backgroundColor: 'rgba(0,0,0,0.4)',
     height: '100%',
-    justifyContent: 'flex-end',
-  },
-  carouselOverlay: {
-    backgroundColor: 'rgba(0,0,0,0.3)',
+    width: '100%',
+    justifyContent: 'center',
+    alignItems: 'center',
     padding: 20,
-    paddingBottom: 40,
   },
-  carouselTitle: {
+  logoImage: {
+    width: 80,
+    height: 80,
+    marginBottom: 16,
+    resizeMode: 'contain',
+  },
+  heroTitle: {
     fontSize: 28,
     fontWeight: 'bold',
     color: 'white',
-    textShadowColor: 'rgba(0, 0, 0, 0.75)',
-    textShadowOffset: {width: -1, height: 1},
-    textShadowRadius: 10,
-    marginBottom: 8,
-  },
-  carouselTagline: {
-    fontSize: 16,
-    color: 'white',
-    textShadowColor: 'rgba(0, 0, 0, 0.75)',
-    textShadowOffset: {width: -1, height: 1},
-    textShadowRadius: 6,
-    marginBottom: 8,
-  },
-  carouselButton: {
-    backgroundColor: '#3c6e71',
-    paddingVertical: 8,
-    paddingHorizontal: 16,
-    borderRadius: 20,
-    alignSelf: 'flex-start',
-  },
-  carouselButtonText: {
-    color: 'white',
-    fontWeight: 'bold',
-  },
-  carouselTags: {
-    flexDirection: 'row',
-  },
-  carouselTag: {
-    backgroundColor: 'rgba(255,255,255,0.2)',
-    paddingVertical: 4,
-    paddingHorizontal: 12,
-    borderRadius: 20,
-    marginRight: 8,
-  },
-  carouselTagText: {
-    color: 'white',
-    fontWeight: '600',
-  },
-  carouselDotsContainer: {
-    position: 'absolute',
-    bottom: 10,
-    width: '100%',
-    flexDirection: 'row',
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  carouselDot: {
-    width: 8,
-    height: 8,
-    borderRadius: 4,
-    backgroundColor: 'rgba(255,255,255,0.4)',
-    marginHorizontal: 4,
-  },
-  carouselDotActive: {
-    backgroundColor: 'white',
-    width: 12,
-    height: 12,
-    borderRadius: 6,
-  },
-  // Main Tagline
-  taglineContainer: {
-    alignItems: 'center',
-    marginVertical: 24,
-    paddingHorizontal: 20,
-  },
-  tagline: {
-    fontSize: 20,
-    fontWeight: 'bold',
-    color: '#3c6e71',
     textAlign: 'center',
     marginBottom: 12,
+    letterSpacing: 1,
   },
-  taglineDivider: {
-    width: 60,
-    height: 3,
-    backgroundColor: '#3c6e71',
-    borderRadius: 2,
+  heroSubtitle: {
+    fontSize: 16,
+    color: 'white',
+    textAlign: 'center',
+    marginBottom: 30,
+    opacity: 0.9,
+  },
+  heroButton: {
+    paddingHorizontal: 16,
+    borderRadius: 30,
+    elevation: 8,
+  },
+  // Fact Container
+  factContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginHorizontal: 16,
+    marginTop: -25,
+    padding: 16,
+    borderRadius: 8,
+    elevation: 4,
+    backgroundColor: '#fff',
+    minHeight: 80,
+  },
+  factIconContainer: {
+    marginRight: 16,
+  },
+  factText: {
+    flex: 1,
+    fontSize: 14,
+    lineHeight: 20,
+    color: '#444',
   },
   // Stats Section
   statsContainer: {
+    marginHorizontal: 16,
+    marginTop: 24,
+    padding: 16,
+    borderRadius: 8,
+    elevation: 2,
+    backgroundColor: '#fff',
+  },
+  statsHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 16,
+  },
+  cebuIcon: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    marginRight: 12,
+  },
+  statsHeaderText: {
+    flex: 1,
+  },
+  statsTitle: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    color: '#333',
+  },
+  statsSubtitle: {
+    fontSize: 14,
+    color: '#666',
+  },
+  statsDivider: {
+    marginBottom: 16,
+  },
+  statsRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    backgroundColor: 'white',
-    marginHorizontal: 16,
-    marginBottom: 24,
-    padding: 16,
-    borderRadius: 12,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 2,
   },
   statItem: {
     flex: 1,
     alignItems: 'center',
   },
   statDivider: {
-    width: 1,
     height: 40,
+    width: 1,
     backgroundColor: '#e0e0e0',
   },
   statNumber: {
     fontSize: 18,
     fontWeight: 'bold',
-    color: '#333',
-    marginTop: 4,
+    marginTop: 8,
+    marginBottom: 4,
   },
   statLabel: {
     fontSize: 12,
-    color: '#666',
-    marginTop: 2,
   },
-  // Spotlight Section
-  spotlightContainer: {
-    paddingHorizontal: 16,
-    marginBottom: 24,
+  // Why Cebu Section
+  whyCebuContainer: {
+    marginHorizontal: 16,
+    marginTop: 32,
+  },
+  sectionHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 16,
   },
   sectionTitle: {
     fontSize: 20,
     fontWeight: 'bold',
-    marginBottom: 16,
     color: '#333',
   },
-  spotlightCard: {
-    height: 240,
-    borderRadius: 16,
-    overflow: 'hidden',
+  sectionDivider: {
+    flex: 1,
+    height: 1,
+    backgroundColor: '#e0e0e0',
+    marginLeft: 12,
   },
-  spotlightImage: {
-    width: '100%',
-    height: '100%',
+  whyCebuCard: {
+    borderRadius: 8,
+    overflow: 'hidden',
+    elevation: 3,
+  },
+  whyCebuImage: {
+    height: 180,
+  },
+  whyCebuContent: {
+    padding: 16,
+  },
+  whyCebuText: {
+    marginBottom: 12,
+    lineHeight: 22,
+  },
+  whyCebuButton: {
+    marginTop: 8,
+    alignSelf: 'flex-end',
+  },
+  // Spotlight Section
+  spotlightContainer: {
+    marginHorizontal: 16,
+    marginTop: 32,
+  },
+  spotlightCard: {
+    borderRadius: 12,
+    overflow: 'hidden',
+    elevation: 4,
+  },
+  spotlightBackground: {
+    height: 320,
     justifyContent: 'flex-end',
   },
-  spotlightOverlay: {
-    backgroundColor: 'rgba(0,0,0,0.3)',
-    padding: 16,
-    borderBottomLeftRadius: 16,
-    borderBottomRightRadius: 16,
+  spotlightGradient: {
+    height: '70%',
+    justifyContent: 'flex-end',
+    paddingBottom: 16,
+    backgroundColor: 'rgba(0,0,0,0.5)',
   },
   spotlightContent: {
-    marginBottom: 8,
+    padding: 16,
   },
-  spotlightName: {
-    fontSize: 22,
-    fontWeight: 'bold',
-    color: 'white',
-    marginBottom: 4,
-    textShadowColor: 'rgba(0, 0, 0, 0.75)',
-    textShadowOffset: {width: -1, height: 1},
-    textShadowRadius: 10
-  },
-  spotlightLocation: {
-    fontSize: 14,
-    color: 'white',
-    marginBottom: 8,
-    textShadowColor: 'rgba(0, 0, 0, 0.75)',
-    textShadowOffset: {width: -1, height: 1},
-    textShadowRadius: 10
-  },
-  spotlightRating: {
+  spotlightHeader: {
     flexDirection: 'row',
+    justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: 10,
+    marginBottom: 12,
   },
-  spotlightRatingText: {
-    marginLeft: 6,
-    color: 'white',
-    fontSize: 12,
-    textShadowColor: 'rgba(0, 0, 0, 0.75)',
-    textShadowOffset: {width: -1, height: 1},
-    textShadowRadius: 10
+  spotlightTitle: {
+    color: '#fff',
+    fontSize: 24,
+    fontWeight: 'bold',
+    flex: 1,
+    textShadowColor: 'rgba(0,0,0,0.75)',
+    textShadowOffset: {width: 0, height: 1},
+    textShadowRadius: 2,
   },
-  spotlightBadge: {
+  difficultyBadge: {
+    paddingHorizontal: 10,
     paddingVertical: 4,
-    paddingHorizontal: 12,
     borderRadius: 4,
-    alignSelf: 'flex-start',
   },
   easyBadge: {
     backgroundColor: '#c6f6d5',
@@ -534,73 +655,113 @@ const styles = StyleSheet.create({
   difficultBadge: {
     backgroundColor: '#fed7d7',
   },
-  spotlightBadgeText: {
+  difficultyText: {
     fontSize: 12,
     fontWeight: 'bold',
     color: '#333',
   },
-  // Featured Trails
-  featuredContainer: {
-    paddingHorizontal: 16,
+  spotlightDetails: {
+    marginBottom: 16,
   },
-  trailsList: {
-    paddingBottom: 8,
-  },
-  // View All Button
-  viewAllButton: {
-    backgroundColor: '#3c6e71',
+  spotlightDetail: {
     flexDirection: 'row',
-    justifyContent: 'center',
     alignItems: 'center',
-    paddingVertical: 14,
-    paddingHorizontal: 20,
-    borderRadius: 8,
-    marginHorizontal: 16,
-    marginTop: 16,
-    marginBottom: 24,
-  },
-  viewAllButtonText: {
-    color: '#fff',
-    fontSize: 16,
-    fontWeight: 'bold',
-    marginRight: 8,
-  },
-  // About Section
-  aboutContainer: {
-    padding: 16,
-    backgroundColor: 'white',
-    marginHorizontal: 16,
-    marginBottom: 24,
-    borderRadius: 12,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 2,
-  },
-  aboutTitle: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    color: '#333',
     marginBottom: 8,
   },
-  aboutText: {
+  spotlightDetailText: {
+    color: '#fff',
+    marginLeft: 8,
     fontSize: 14,
-    lineHeight: 22,
+    textShadowColor: 'rgba(0,0,0,0.75)',
+    textShadowOffset: {width: 0, height: 1},
+    textShadowRadius: 2,
+  },
+  spotlightDescription: {
+    color: '#fff', 
+    marginBottom: 16,
+    fontSize: 14,
+    lineHeight: 20,
+    textShadowColor: 'rgba(0,0,0,0.75)',
+    textShadowOffset: {width: 0, height: 1},
+    textShadowRadius: 2,
+  },
+  spotlightButton: {
+    borderRadius: 30,
+  },
+  // More Trails Section - With Custom Cards
+  moreTrailsContainer: {
+    marginHorizontal: 16,
+    marginTop: 32,
+    marginBottom: 16,
+  },
+  viewAllButton: {
+    marginRight: -8,
+  },
+  customTrailsGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    justifyContent: 'space-between',
+    marginTop: 8,
+  },
+  // Custom Trail Card Styles
+  customTrailCard: {
+    width: '48%', // Almost half width to fit two cards per row with spacing
+    marginBottom: 16,
+    borderRadius: 12,
+    overflow: 'hidden',
+    elevation: 3,
+  },
+  customTrailImage: {
+    width: '100%',
+    height: 140,
+  },
+  customTrailContent: {
+    padding: 12,
+  },
+  customTrailTitle: {
+    fontSize: 16,
+    fontWeight: 'bold',
+    marginBottom: 8,
+  },
+  customTrailInfoRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 8,
+    justifyContent: 'space-between',
+  },
+  customTrailInfoText: {
+    marginLeft: 6,
+    fontSize: 12,
+    color: '#666',
+    flex: 1,
+  },
+  trailMetaContainer: {
+    flexDirection: 'column',
+    alignItems: 'flex-start',
+  },
+  metaItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 4,
+  },
+  metaText: {
+    marginLeft: 4,
+    fontSize: 11,
     color: '#666',
   },
   // Admin Button
   adminButton: {
-    alignSelf: 'center',
-    marginTop: 10,
-    marginBottom: 30,
-    padding: 10,
-    backgroundColor: '#f0f0f0',
-    borderRadius: 5,
+    marginHorizontal: 16,
+    marginBottom: 80,
+    marginTop: 20,
   },
-  adminButtonText: {
-    color: '#666',
-    fontSize: 12,
+  // FAB
+  fab: {
+    position: 'absolute',
+    margin: 16,
+    right: 0,
+    bottom: 0,
+    borderRadius: 28,
   },
 });
 

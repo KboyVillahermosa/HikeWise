@@ -14,6 +14,49 @@ export const saveUserProfile = async (userId, userData) => {
   }
 };
 
+export const getUserProfile = async (userId) => {
+  try {
+    const userDocRef = doc(db, 'users', userId);
+    const userDocSnap = await getDoc(userDocRef);
+    
+    if (userDocSnap.exists()) {
+      return {
+        id: userDocSnap.id,
+        ...userDocSnap.data()
+      };
+    } else {
+      console.log("No user profile found with ID:", userId);
+      return null;
+    }
+  } catch (error) {
+    console.error("Error getting user profile:", error);
+    throw error;
+  }
+};
+
+export const updateUserProfile = async (userId, userData) => {
+  try {
+    const userDocRef = doc(db, 'users', userId);
+    const userDocSnap = await getDoc(userDocRef);
+    
+    if (userDocSnap.exists()) {
+      // Update existing user document
+      await updateDoc(userDocRef, userData);
+    } else {
+      // Create new user document
+      await setDoc(userDocRef, {
+        ...userData,
+        createdAt: new Date()
+      });
+    }
+    
+    return true;
+  } catch (error) {
+    console.error("Error updating user profile:", error);
+    throw error;
+  }
+};
+
 // Trail functions
 export const getTrails = async () => {
   try {
@@ -65,6 +108,38 @@ export const getTrailById = async (trailId) => {
   }
 };
 
+export const getTrailsById = async (trailIds) => {
+  try {
+    if (!trailIds || trailIds.length === 0) {
+      return [];
+    }
+    
+    const trails = [];
+    const trailsCollection = collection(db, 'trails');
+    
+    // Firestore can only filter with "in" for up to 10 items at a time
+    const batchSize = 10;
+    
+    for (let i = 0; i < trailIds.length; i += batchSize) {
+      const batch = trailIds.slice(i, i + batchSize);
+      const q = query(trailsCollection, where('__name__', 'in', batch));
+      const querySnapshot = await getDocs(q);
+      
+      querySnapshot.forEach(doc => {
+        trails.push({
+          id: doc.id,
+          ...doc.data()
+        });
+      });
+    }
+    
+    return trails;
+  } catch (error) {
+    console.error("Error getting trails by ID:", error);
+    throw error;
+  }
+};
+
 // Rating functions
 export const rateTrail = async (trailId, userId, rating, comment = '') => {
   try {
@@ -95,7 +170,7 @@ export const rateTrail = async (trailId, userId, rating, comment = '') => {
     }
     
     // Then, update the trail's average rating
-    await updateTrailRating(trailId);
+    await calculateTrailAverageRating(trailId);
     
     return true;
   } catch (error) {
@@ -147,8 +222,8 @@ export const getUserTrailRating = async (trailId, userId) => {
   }
 };
 
-// Update trail's average rating
-const updateTrailRating = async (trailId) => {
+// Update trail's average rating (internal function)
+const calculateTrailAverageRating = async (trailId) => {
   try {
     const ratings = await getTrailRatings(trailId);
     if (ratings.length === 0) return;
@@ -161,6 +236,57 @@ const updateTrailRating = async (trailId) => {
       averageRating: average,
       ratingCount: ratings.length
     });
+  } catch (error) {
+    console.error('Error updating trail rating:', error);
+    throw error;
+  }
+};
+
+export const updateTrailRating = async (trailId, rating, userId) => {
+  try {
+    const trailRef = doc(db, 'trails', trailId);
+    const trailDoc = await getDoc(trailRef);
+    
+    if (!trailDoc.exists()) {
+      throw new Error('Trail not found');
+    }
+    
+    const trailData = trailDoc.data();
+    const userRatingsRef = collection(db, 'trails', trailId, 'ratings');
+    const userRatingRef = doc(userRatingsRef, userId);
+    
+    // Get the user's previous rating if it exists
+    const userRatingDoc = await getDoc(userRatingRef);
+    const oldRating = userRatingDoc.exists() ? userRatingDoc.data().rating : 0;
+    
+    // Save the user's rating
+    await setDoc(userRatingRef, {
+      rating: rating,
+      userId: userId,
+      timestamp: serverTimestamp()
+    });
+    
+    // Update the trail's average rating
+    const newRatingCount = oldRating > 0 
+      ? trailData.ratingCount || 0 
+      : (trailData.ratingCount || 0) + 1;
+    
+    const totalRatingPoints = oldRating > 0
+      ? (trailData.averageRating || 0) * (trailData.ratingCount || 0) - oldRating + rating
+      : (trailData.averageRating || 0) * (trailData.ratingCount || 0) + rating;
+    
+    const newAverageRating = totalRatingPoints / newRatingCount;
+    
+    // Update the trail document
+    await updateDoc(trailRef, {
+      averageRating: newAverageRating,
+      ratingCount: newRatingCount
+    });
+    
+    // Then, update the trail's average rating
+    await calculateTrailAverageRating(trailId);
+    
+    return { success: true };
   } catch (error) {
     console.error('Error updating trail rating:', error);
     throw error;

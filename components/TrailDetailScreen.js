@@ -6,7 +6,8 @@ import {
 import { Ionicons } from '@expo/vector-icons';
 import { 
   getTrailById, rateTrail, getTrailRatings, 
-  getUserTrailRating, addToFavorites, removeFromFavorites 
+  getUserTrailRating, addToFavorites, removeFromFavorites,
+  getUserProfile // Add this import
 } from '../firebase/firestoreService';
 import StarRating from './StarRating';
 import { auth } from '../firebase/config';
@@ -50,9 +51,20 @@ const TrailDetailScreen = ({ trailId, setActiveScreen }) => {
           }
           
           // Check if trail is in user's favorites
-          const userDoc = await getUserProfile(currentUser.uid);
-          if (userDoc && userDoc.favoriteTrails) {
-            setIsFavorite(userDoc.favoriteTrails.includes(trailId));
+          try {
+            // Try to get the user profile if the function exists
+            if (typeof getUserProfile === 'function') {
+              const userDoc = await getUserProfile(currentUser.uid);
+              if (userDoc && userDoc.favoriteTrails) {
+                setIsFavorite(userDoc.favoriteTrails.includes(trailId));
+              }
+            } else {
+              // Skip favorites check for now
+              console.log("getUserProfile function is not available, skipping favorites check");
+            }
+          } catch (error) {
+            console.error("Error checking favorites:", error);
+            // Continue execution without favorites information
           }
         }
       } catch (error) {
@@ -224,50 +236,104 @@ const TrailDetailScreen = ({ trailId, setActiveScreen }) => {
           
           {showRatingInput && (
             <View style={styles.ratingInputContainer}>
-              <Text style={styles.ratingInputLabel}>Your Rating:</Text>
-              <StarRating 
-                rating={userRating} 
-                editable={true}
-                onRatingChange={setUserRating}
-                size={32}
-              />
+              <Text style={styles.ratingInputLabel}>
+                {userRating > 0 ? 'Your Rating' : 'Tap to Rate This Trail'}
+              </Text>
+              
+              <View style={styles.starRatingContainer}>
+                <StarRating 
+                  rating={userRating} 
+                  editable={true}
+                  onRatingChange={setUserRating}
+                  size={40}
+                  activeColor="#FFD700"
+                  hoverColor="#FFC107"
+                />
+                
+                {userRating > 0 && (
+                  <View style={styles.selectedRatingBadge}>
+                    <Text style={styles.selectedRatingText}>{userRating.toFixed(1)}</Text>
+                  </View>
+                )}
+              </View>
               
               <TextInput
-                style={styles.commentInput}
-                placeholder="Write a comment (optional)"
+                style={[
+                  styles.commentInput,
+                  userRating > 0 ? styles.commentInputActive : {}
+                ]}
+                placeholder={userRating > 0 ? "Share your experience (optional)" : "First select a rating above"}
                 value={userComment}
                 onChangeText={setUserComment}
                 multiline
+                maxLength={500}
+                editable={userRating > 0}
               />
               
-              <TouchableOpacity 
-                style={styles.submitButton}
-                onPress={handleSubmitRating}
-                disabled={submittingRating}
-              >
-                <Text style={styles.submitButtonText}>
-                  {submittingRating ? 'Submitting...' : 'Submit Rating'}
+              <View style={styles.inputFooter}>
+                <Text style={styles.characterCounter}>
+                  {userComment.length}/500
                 </Text>
-              </TouchableOpacity>
+                
+                <TouchableOpacity 
+                  style={[
+                    styles.submitButton,
+                    userRating === 0 ? styles.submitButtonDisabled : {}
+                  ]}
+                  onPress={handleSubmitRating}
+                  disabled={submittingRating || userRating === 0}
+                >
+                  {submittingRating ? (
+                    <ActivityIndicator size="small" color="#fff" />
+                  ) : (
+                    <Text style={styles.submitButtonText}>
+                      {userRating > 0 ? 'Submit Rating' : 'Select Rating'}
+                    </Text>
+                  )}
+                </TouchableOpacity>
+              </View>
             </View>
           )}
           
           {ratings.length > 0 ? (
-            ratings.map(rating => (
-              <View key={rating.id} style={styles.reviewItem}>
-                <View style={styles.reviewHeader}>
-                  <StarRating rating={rating.rating} size={16} />
-                  <Text style={styles.reviewDate}>
-                    {rating.timestamp ? new Date(rating.timestamp.toDate()).toLocaleDateString() : 'Recently'}
-                  </Text>
+            <View style={styles.reviewsList}>
+              {ratings.map(rating => (
+                <View key={rating.id} style={styles.reviewItem}>
+                  <View style={styles.reviewHeader}>
+                    <View style={styles.reviewerInfo}>
+                      <View style={styles.reviewerAvatar}>
+                        <Ionicons name="person" size={18} color="#fff" />
+                      </View>
+                      <Text style={styles.reviewerName}>
+                        {rating.userId === currentUser?.uid ? 'You' : 'Hiker'}
+                      </Text>
+                    </View>
+                    <Text style={styles.reviewDate}>
+                      {rating.timestamp ? new Date(rating.timestamp.toDate()).toLocaleDateString() : 'Recently'}
+                    </Text>
+                  </View>
+                  
+                  <View style={styles.reviewRating}>
+                    <StarRating rating={rating.rating} size={16} />
+                    <Text style={styles.reviewRatingText}>{rating.rating.toFixed(1)}</Text>
+                  </View>
+                  
+                  {rating.comment ? (
+                    <Text style={styles.reviewComment}>{rating.comment}</Text>
+                  ) : (
+                    <Text style={styles.noCommentText}>Rating only, no comment provided</Text>
+                  )}
                 </View>
-                {rating.comment ? (
-                  <Text style={styles.reviewComment}>{rating.comment}</Text>
-                ) : null}
-              </View>
-            ))
+              ))}
+            </View>
           ) : (
-            <Text style={styles.noReviewsText}>Be the first to review this trail!</Text>
+            <View style={styles.noReviewsContainer}>
+              <Ionicons name="star-outline" size={40} color="#ccc" />
+              <Text style={styles.noReviewsText}>Be the first to review this trail!</Text>
+              <Text style={styles.noReviewsPrompt}>
+                Your ratings help others discover great trails
+              </Text>
+            </View>
           )}
         </View>
       </View>
@@ -412,61 +478,169 @@ const styles = StyleSheet.create({
     fontSize: 14,
   },
   ratingInputContainer: {
-    backgroundColor: '#f5f5f5',
-    padding: 16,
-    borderRadius: 8,
-    marginBottom: 16,
+    backgroundColor: '#f9f9f9',
+    borderRadius: 12,
+    padding: 20,
+    marginBottom: 20,
+    borderWidth: 1,
+    borderColor: '#e0e0e0',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 3,
   },
   ratingInputLabel: {
-    fontSize: 16,
-    fontWeight: '500',
-    marginBottom: 8,
+    fontSize: 18,
+    fontWeight: '600',
+    color: '#333',
+    marginBottom: 16,
+    textAlign: 'center',
+  },
+  starRatingContainer: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 20,
+    paddingVertical: 10,
+    flexDirection: 'row',
+  },
+  selectedRatingBadge: {
+    backgroundColor: '#3c6e71',
+    borderRadius: 15,
+    width: 30,
+    height: 30,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginLeft: 12,
+  },
+  selectedRatingText: {
+    color: '#fff',
+    fontWeight: 'bold',
+    fontSize: 14,
   },
   commentInput: {
-    backgroundColor: '#fff',
+    backgroundColor: '#f0f0f0',
     borderRadius: 8,
-    padding: 12,
-    marginTop: 16,
-    marginBottom: 16,
-    minHeight: 80,
+    padding: 16,
+    marginVertical: 12,
+    minHeight: 100,
     textAlignVertical: 'top',
+    borderWidth: 1,
+    borderColor: '#e0e0e0',
+    fontSize: 16,
+    color: '#777',
+  },
+  commentInputActive: {
+    backgroundColor: '#fff',
+    color: '#333',
+    borderColor: '#3c6e71',
+  },
+  inputFooter: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginTop: 8,
+  },
+  characterCounter: {
+    fontSize: 12,
+    color: '#888',
   },
   submitButton: {
     backgroundColor: '#3c6e71',
     paddingVertical: 12,
+    paddingHorizontal: 20,
     borderRadius: 8,
     alignItems: 'center',
+    justifyContent: 'center',
+    minWidth: 120,
+  },
+  submitButtonDisabled: {
+    backgroundColor: '#a0b7b8',
   },
   submitButtonText: {
     color: '#fff',
     fontWeight: 'bold',
     fontSize: 16,
   },
+  reviewsList: {
+    marginTop: 12,
+  },
   reviewItem: {
     backgroundColor: '#f9f9f9',
-    padding: 12,
-    borderRadius: 8,
-    marginBottom: 8,
+    padding: 16,
+    borderRadius: 10,
+    marginBottom: 12,
+    borderWidth: 1,
+    borderColor: '#eee',
   },
   reviewHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: 6,
+    marginBottom: 12,
+  },
+  reviewerInfo: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  reviewerAvatar: {
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    backgroundColor: '#3c6e71',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: 8,
+  },
+  reviewerName: {
+    fontWeight: '500',
+    color: '#333',
+    fontSize: 15,
   },
   reviewDate: {
     fontSize: 12,
-    color: '#666',
+    color: '#888',
+  },
+  reviewRating: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 10,
+  },
+  reviewRatingText: {
+    marginLeft: 8,
+    fontSize: 14,
+    fontWeight: 'bold',
+    color: '#3c6e71',
   },
   reviewComment: {
-    fontSize: 14,
+    fontSize: 15,
     color: '#333',
+    lineHeight: 22,
+  },
+  noCommentText: {
+    fontStyle: 'italic',
+    color: '#888',
+    fontSize: 14,
+  },
+  noReviewsContainer: {
+    alignItems: 'center',
+    padding: 24,
+    backgroundColor: '#f9f9f9',
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: '#eee',
   },
   noReviewsText: {
-    textAlign: 'center',
     color: '#666',
-    fontStyle: 'italic',
+    fontWeight: '500',
+    fontSize: 16,
+    marginTop: 12,
+  },
+  noReviewsPrompt: {
+    color: '#888',
+    fontSize: 14,
     marginTop: 8,
+    textAlign: 'center',
   },
 });
 

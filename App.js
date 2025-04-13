@@ -10,6 +10,20 @@ import LoginScreen from './components/LoginScreen';
 import RegisterScreen from './components/RegisterScreen';
 import TrailsScreen from './components/TrailsScreen';
 import TrailDetailScreen from './components/TrailDetailScreen';
+import ProfileScreen from './components/ProfileScreen';
+import { Provider as PaperProvider, DefaultTheme } from 'react-native-paper';
+
+const theme = {
+  ...DefaultTheme,
+  colors: {
+    ...DefaultTheme.colors,
+    primary: '#3c6e71',
+    accent: '#f7a072',
+    background: '#f5f5f5',
+    surface: '#ffffff',
+    text: '#333333',
+  },
+};
 
 export default function App() {
   const [activeScreen, setActiveScreen] = useState('Login');
@@ -74,6 +88,8 @@ export default function App() {
               setActiveScreen={setActiveScreen}
             />
           );
+        case 'Profile':
+          return <ProfileScreen setActiveScreen={setActiveScreen} />;
         default:
           return <HomeScreen setActiveScreen={setActiveScreen} />;
       }
@@ -84,20 +100,22 @@ export default function App() {
   const showNavbar = user !== null;
 
   return (
-    <SafeAreaView style={styles.container}>
-      {showNavbar && (
-        <Navbar 
-          activeScreen={activeScreen} 
-          setActiveScreen={setActiveScreen} 
-          user={user}
-          handleLogout={() => auth.signOut()}
-        />
-      )}
-      <View style={styles.content}>
-        {renderScreen()}
-      </View>
-      <StatusBar style="light" />
-    </SafeAreaView>
+    <PaperProvider theme={theme}>
+      <SafeAreaView style={styles.container}>
+        {showNavbar && (
+          <Navbar 
+            activeScreen={activeScreen} 
+            setActiveScreen={setActiveScreen} 
+            user={user}
+            handleLogout={() => auth.signOut()}
+          />
+        )}
+        <View style={styles.content}>
+          {renderScreen()}
+        </View>
+        <StatusBar style="light" />
+      </SafeAreaView>
+    </PaperProvider>
   );
 }
 

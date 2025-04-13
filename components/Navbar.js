@@ -1,79 +1,194 @@
 import React from 'react';
-import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
-import { Ionicons } from '@expo/vector-icons';
+import { StyleSheet, View, Text, TouchableOpacity } from 'react-native';
+import { 
+  Appbar, 
+  Menu, 
+  Avatar, 
+  Divider, 
+  useTheme,
+  IconButton
+} from 'react-native-paper';
+import Ionicons from 'react-native-vector-icons/Ionicons';
 
 const Navbar = ({ activeScreen, setActiveScreen, user, handleLogout }) => {
+  const theme = useTheme();
+  const [menuVisible, setMenuVisible] = React.useState(false);
+  
+  const openMenu = () => setMenuVisible(true);
+  const closeMenu = () => setMenuVisible(false);
+  
+  const getTitle = () => {
+    switch(activeScreen) {
+      case 'Home': return 'Cebu Hiking Spots';
+      case 'Trails': return 'Hiking Trails';
+      case 'TrailDetail': return 'Trail Details';
+      case 'About': return 'About';
+      case 'Profile': return 'Profile';
+      default: return 'Cebu Hiking Spots';
+    }
+  };
+  
   return (
-    <View style={styles.navbar}>
-      <Text style={styles.logo}>Cebu Hikes</Text>
-      <View style={styles.navLinks}>
-        <TouchableOpacity 
-          style={[styles.navItem, activeScreen === 'Home' && styles.activeNavItem]} 
-          onPress={() => setActiveScreen('Home')}
-        >
-          <Text style={[styles.navText, activeScreen === 'Home' && styles.activeNavText]}>Home</Text>
-        </TouchableOpacity>
+    <Appbar.Header style={styles.header}>
+      {activeScreen !== 'Home' && (
+        <Appbar.BackAction onPress={() => setActiveScreen('Home')} />
+      )}
+      
+      <Appbar.Content 
+        title={getTitle()} 
+        titleStyle={styles.title}
+      />
+      
+      <View style={styles.actions}>
+        {activeScreen === 'Trails' && (
+          <Appbar.Action icon="magnify" onPress={() => {/* Search functionality */}} />
+        )}
         
-        <TouchableOpacity 
-          style={[styles.navItem, activeScreen === 'Trails' && styles.activeNavItem]} 
-          onPress={() => setActiveScreen('Trails')}
-        >
-          <Text style={[styles.navText, activeScreen === 'Trails' && styles.activeNavText]}>Trails</Text>
-        </TouchableOpacity>
+        <Appbar.Action 
+          icon={activeScreen === 'Home' ? 'view-dashboard-outline' : 'home-outline'}
+          onPress={() => setActiveScreen('Home')} 
+        />
         
-        <TouchableOpacity 
-          style={[styles.navItem, activeScreen === 'About' && styles.activeNavItem]} 
-          onPress={() => setActiveScreen('About')}
+        <Menu
+          visible={menuVisible}
+          onDismiss={closeMenu}
+          anchor={
+            <Appbar.Action 
+              icon="menu" 
+              onPress={openMenu}
+              color={theme.colors.surface}
+            />
+          }
+          contentStyle={styles.menuContent}
         >
-          <Text style={[styles.navText, activeScreen === 'About' && styles.activeNavText]}>About</Text>
-        </TouchableOpacity>
-        
-        <TouchableOpacity 
-          style={styles.navItem} 
-          onPress={handleLogout}
-        >
-          <Ionicons name="log-out-outline" size={18} color="#ffffff" />
-        </TouchableOpacity>
+          <View style={styles.menuHeader}>
+            <Avatar.Icon 
+              size={40} 
+              icon="account" 
+              style={styles.avatar}
+            />
+            <View style={styles.userInfo}>
+              <Menu.Item 
+                title={user?.displayName || user?.email || 'User'} 
+                disabled
+                titleStyle={styles.userName}
+              />
+            </View>
+          </View>
+          
+          <Divider />
+          
+          <Menu.Item 
+            icon="view-dashboard-outline" 
+            onPress={() => {
+              setActiveScreen('Home');
+              closeMenu();
+            }} 
+            title="Home" 
+          />
+          
+          <Menu.Item 
+            icon="hiking" 
+            onPress={() => {
+              setActiveScreen('Trails');
+              closeMenu();
+            }} 
+            title="All Trails" 
+          />
+          
+          <Menu.Item 
+            icon="information-outline" 
+            onPress={() => {
+              setActiveScreen('About');
+              closeMenu();
+            }} 
+            title="About" 
+          />
+          
+          <Divider />
+          
+          <Menu.Item 
+            icon="logout" 
+            onPress={() => {
+              handleLogout();
+              closeMenu();
+            }} 
+            title="Logout" 
+          />
+        </Menu>
       </View>
-    </View>
+      
+      {/* Add a Profile option to your navigation items */}
+      <TouchableOpacity
+        style={[
+          styles.navItem,
+          activeScreen === 'Profile' && styles.activeNavItem
+        ]}
+        onPress={() => setActiveScreen('Profile')}
+      >
+        <Ionicons
+          name="person"
+          size={24}
+          color={activeScreen === 'Profile' ? '#3c6e71' : '#666'}
+        />
+        <Text
+          style={[
+            styles.navText,
+            activeScreen === 'Profile' && styles.activeNavText
+          ]}
+        >
+          Profile
+        </Text>
+      </TouchableOpacity>
+    </Appbar.Header>
   );
 };
 
 const styles = StyleSheet.create({
-  navbar: {
-    width: '100%',
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    paddingTop: 50,
-    paddingBottom: 10,
-    paddingHorizontal: 20,
-    backgroundColor: '#3c6e71',
+  header: {
+    elevation: 4,
   },
-  logo: {
-    color: '#ffffff',
-    fontSize: 18,
+  title: {
     fontWeight: 'bold',
   },
-  navLinks: {
+  actions: {
     flexDirection: 'row',
   },
+  menuContent: {
+    marginTop: 40,
+    minWidth: 200,
+  },
+  menuHeader: {
+    flexDirection: 'row',
+    padding: 8,
+    alignItems: 'center',
+  },
+  avatar: {
+    marginRight: 8,
+  },
+  userInfo: {
+    flex: 1,
+  },
+  userName: {
+    fontWeight: 'bold',
+  },
   navItem: {
-    marginLeft: 20,
-    paddingVertical: 8,
-    paddingHorizontal: 12,
-    borderRadius: 20,
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: 10,
   },
   activeNavItem: {
-    backgroundColor: '#ffffff',
+    backgroundColor: '#e0f7fa',
   },
   navText: {
-    color: '#ffffff',
-    fontWeight: '500',
+    marginLeft: 8,
+    fontSize: 16,
+    color: '#666',
   },
   activeNavText: {
     color: '#3c6e71',
-  }
+    fontWeight: 'bold',
+  },
 });
 
 export default Navbar;
