@@ -2,7 +2,6 @@ import React, { useState } from 'react';
 import { View, Text, TextInput, TouchableOpacity, StyleSheet, Alert } from 'react-native';
 import { createUserWithEmailAndPassword, updateProfile } from 'firebase/auth';
 import { auth } from '../firebase/config';
-import { saveUserProfile } from '../firebase/firestoreService';
 
 const RegisterScreen = ({ setActiveScreen }) => {
   const [username, setUsername] = useState('');
@@ -29,15 +28,6 @@ const RegisterScreen = ({ setActiveScreen }) => {
       // Update the user profile with the username
       await updateProfile(userCredential.user, {
         displayName: username
-      });
-      
-      // Save user data to Firestore
-      await saveUserProfile(userCredential.user.uid, {
-        displayName: username,
-        email: email,
-        createdAt: new Date(),
-        favoriteTrails: [],
-        photoURL: null
       });
       
       Alert.alert('Success', 'Registration successful!', [

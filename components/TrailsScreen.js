@@ -1,41 +1,45 @@
 import React, { useState, useEffect } from 'react';
 import { 
   View, Text, FlatList, TouchableOpacity, Image, 
-  StyleSheet, ActivityIndicator, TextInput, Modal 
+  StyleSheet, ActivityIndicator, TextInput, Modal,
+  ScrollView
 } from 'react-native';
-import { getTrails, getTopRatedTrails } from '../firebase/firestoreService';
+import { getLocalTrails, getLocalTopRatedTrails } from '../data/localTrailsData';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import StarRating from './StarRating';
-import { Button, Portal, Surface, Title, IconButton } from 'react-native-paper';
+import { Button, Portal, Surface, Title, IconButton, Paragraph, Divider, Chip } from 'react-native-paper';
 
-const TrailsScreen = ({ navigation, setActiveScreen }) => {
+const TrailsScreen = ({ navigation, setActiveScreen, setSelectedTrailId }) => {
   const [trails, setTrails] = useState([]);
   const [topRatedTrails, setTopRatedTrails] = useState([]);
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
-  const [filter, setFilter] = useState('all'); // 'all', 'easy', 'moderate', 'difficult'
+  const [filter, setFilter] = useState('all');
   const [ratingModalVisible, setRatingModalVisible] = useState(false);
+  const [detailModalVisible, setDetailModalVisible] = useState(false);
   const [userRating, setUserRating] = useState(0);
   const [submitting, setSubmitting] = useState(false);
   const [selectedTrail, setSelectedTrail] = useState(null);
 
   useEffect(() => {
-    const fetchTrails = async () => {
+    const loadData = async () => {
       try {
         setLoading(true);
-        const allTrails = await getTrails();
-        const topTrails = await getTopRatedTrails(3);
+        const allTrails = getLocalTrails();
+        const topTrails = getLocalTopRatedTrails(5);
+        
+        await new Promise(resolve => setTimeout(resolve, 500));
         
         setTrails(allTrails);
         setTopRatedTrails(topTrails);
       } catch (error) {
-        console.error('Error fetching trails:', error);
+        console.error('Error loading trails:', error);
       } finally {
         setLoading(false);
       }
     };
 
-    fetchTrails();
+    loadData();
   }, []);
 
   const filteredTrails = trails.filter(trail => {
@@ -49,10 +53,18 @@ const TrailsScreen = ({ navigation, setActiveScreen }) => {
 
   const handleTrailPress = (trail) => {
     setSelectedTrail(trail);
+    setDetailModalVisible(true);
+  };
+
+  const handleRatePress = (trail) => {
+    setSelectedTrail(trail);
     setRatingModalVisible(true);
   };
 
-  const showRatingModal = () => setRatingModalVisible(true);
+  const hideDetailModal = () => {
+    setDetailModalVisible(false);
+  };
+
   const hideRatingModal = () => {
     setRatingModalVisible(false);
     setUserRating(0);
@@ -63,8 +75,20 @@ const TrailsScreen = ({ navigation, setActiveScreen }) => {
   const submitRating = async () => {
     setSubmitting(true);
     try {
-      // Submit the rating logic here
-      console.log(`Submitting rating ${userRating} for trail ${selectedTrail.name}`);
+      const updatedTrail = {
+        ...selectedTrail,
+        ratingCount: (selectedTrail.ratingCount || 0) + 1,
+        averageRating: (((selectedTrail.averageRating || 0) * (selectedTrail.ratingCount || 0)) + userRating) / 
+                      ((selectedTrail.ratingCount || 0) + 1)
+      };
+      
+      const updatedTrails = trails.map(t => t.id === selectedTrail.id ? updatedTrail : t);
+      setTrails(updatedTrails);
+      
+      const newTopRated = getLocalTopRatedTrails(5, updatedTrails);
+      setTopRatedTrails(newTopRated);
+      
+      console.log(`Submitted rating ${userRating} for trail ${selectedTrail.name}`);
     } catch (error) {
       console.error('Error submitting rating:', error);
     } finally {
@@ -78,13 +102,7 @@ const TrailsScreen = ({ navigation, setActiveScreen }) => {
       style={styles.trailCard}
       onPress={() => handleTrailPress(item)}
     >
-      {item.imageUrl ? (
-        <Image source={{ uri: item.imageUrl }} style={styles.trailImage} />
-      ) : (
-        <View style={[styles.trailImage, styles.placeholderImage]}>
-          <Ionicons name="image-outline" size={40} color="#c5c5c5" />
-        </View>
-      )}
+      <Image source={getImageSource(item)} style={styles.trailImage} />
       
       <View style={styles.trailInfo}>
         <Text style={styles.trailName}>{item.name}</Text>
@@ -115,7 +133,10 @@ const TrailsScreen = ({ navigation, setActiveScreen }) => {
 
   const renderTopRatedSection = () => (
     <View style={styles.topRatedSection}>
-      <Text style={styles.sectionTitle}>Top Rated Trails</Text>
+      <View style={styles.sectionTitleRow}>
+        <Text style={styles.sectionTitle}>Most Popular Trails</Text>
+        <Chip icon="star" style={styles.featuredChip}>Featured</Chip>
+      </View>
       <FlatList
         horizontal
         showsHorizontalScrollIndicator={false}
@@ -126,15 +147,32 @@ const TrailsScreen = ({ navigation, setActiveScreen }) => {
             style={styles.topRatedCard}
             onPress={() => handleTrailPress(item)}
           >
-            {item.imageUrl ? (
-              <Image source={{ uri: item.imageUrl }} style={styles.topRatedImage} />
-            ) : (
-              <View style={[styles.topRatedImage, styles.placeholderImage]}>
-                <Ionicons name="image-outline" size={40} color="#c5c5c5" />
+            <Image source={getImageSource(item)} style={styles.topRatedImage} />
+            <View style={styles.topRatedOverlay}>
+              <Text style={styles.topRatedRank}>
+                #{topRatedTrails.findIndex(trail => trail.id === item.id) + 1}
+              </Text>
+            </View>
+            <View style={styles.topRatedContent}>
+              <Text style={styles.topRatedName}>{item.name}</Text>
+              <View style={styles.topRatedRatingRow}>
+                <StarRating rating={item.averageRating || 0} size={14} />
+                <Text style={styles.topRatedRatingText}>
+                  {item.averageRating ? item.averageRating.toFixed(1) : '-'}
+                </Text>
               </View>
-            )}
-            <Text style={styles.topRatedName}>{item.name}</Text>
-            <StarRating rating={item.averageRating || 0} size={14} />
+              <View style={styles.topRatedMeta}>
+                <Text style={[
+                  styles.topRatedDifficulty,
+                  item.difficulty.toLowerCase() === 'easy' ? styles.easyText : 
+                  item.difficulty.toLowerCase() === 'moderate' ? styles.moderateText : 
+                  styles.difficultText
+                ]}>
+                  {item.difficulty}
+                </Text>
+                <Text style={styles.topRatedDistance}>{item.distance} km</Text>
+              </View>
+            </View>
           </TouchableOpacity>
         )}
       />
@@ -149,6 +187,88 @@ const TrailsScreen = ({ navigation, setActiveScreen }) => {
       </View>
     );
   }
+
+  const getImageSource = (trail) => {
+    if (!trail) return require('../assets/images/icon.png');
+    
+    // If imageUrl is already a require() result (object from localTrailsData)
+    if (typeof trail.imageUrl === 'object' && trail.imageUrl !== null) {
+      return trail.imageUrl;
+    }
+    
+    // Use different images based on trail ID or name to ensure variety
+    // This creates a deterministic mapping of trails to different images
+    if (trail.id) {
+      // Use modulo operation to cycle through available images
+      const imageIndex = parseInt(trail.id.replace(/[^\d]/g, '')) % 8;
+      
+      switch(imageIndex) {
+        case 0:
+          return require('../assets/images/spot1.webp');
+        case 1:
+          return require('../assets/images/spot2.webp');
+        case 2:
+          return require('../assets/images/spot2.webp');
+        case 3:
+          return require('../assets/images/spot2.webp'); 
+        case 4:
+          return require('../assets/images/spot2.webp');
+        case 5:
+          return require('../assets/images/spot2.webp');
+        case 6: 
+          return require('../assets/images/spot2.webp');
+        case 7:
+          return require('../assets/images/spot2.webp');
+        default:
+          return require('../assets/images/icon.png');
+      }
+    }
+    
+    // Fallback to string path handling
+    if (typeof trail.imageUrl === 'string') {
+      if (trail.imageUrl.includes('spot1.webp')) {
+        return require('../assets/images/spot1.webp');
+      } else if (trail.imageUrl.includes('spot2.webp')) {
+        return require('../assets/images/spot2.webp');
+      } else if (trail.imageUrl.includes('trail')) {
+        const trailNum = trail.imageUrl.match(/trail(\d+)/);
+        if (trailNum && trailNum[1]) {
+          const num = parseInt(trailNum[1]);
+          switch(num) {
+            case 1:
+              return require('../assets/images/spot1.webp');
+            case 2:
+              return require('../assets/images/spot1.webp');
+            case 3:
+              return require('../assets/images/spot1.webp');
+            case 4:
+              return require('../assets/images/spot1.webp');
+            case 5:
+              return require('../assets/images/spot1.webp');
+            case 6:
+              return require('../assets/images/spot1.webp');
+            default:
+              return require('../assets/images/spot1.webp');
+          }
+        }
+      }
+    }
+    
+    // If we can't determine an image, use trail attributes to pick one
+    // This helps ensure consistent images for the same trail
+    if (trail.difficulty) {
+      if (trail.difficulty.toLowerCase() === 'easy') {
+        return require('../assets/images/spot2.webp');
+      } else if (trail.difficulty.toLowerCase() === 'moderate') {
+        return require('../assets/images/spot2.webp');
+      } else {
+        return require('../assets/images/spot2.webp');
+      }
+    }
+    
+    // Final fallback
+    return require('../assets/images/icon.png');
+  };
 
   return (
     <View style={styles.container}>
@@ -205,6 +325,140 @@ const TrailsScreen = ({ navigation, setActiveScreen }) => {
 
       <Portal>
         <Modal
+          visible={detailModalVisible}
+          onDismiss={hideDetailModal}
+          contentContainerStyle={styles.detailModalContainer}
+        >
+          {selectedTrail && (
+            <Surface style={styles.detailModalContent}>
+              <IconButton
+                icon="close"
+                size={24}
+                style={styles.closeButton}
+                onPress={hideDetailModal}
+              />
+              
+              <ScrollView showsVerticalScrollIndicator={false}>
+                <Image 
+                  source={getImageSource(selectedTrail)}
+                  style={styles.detailModalImage}
+                  resizeMode="cover"
+                />
+                
+                <View style={styles.detailHeaderRow}>
+                  <Title style={styles.detailModalTitle}>{selectedTrail.name}</Title>
+                  <Button 
+                    mode="contained" 
+                    onPress={() => {
+                      hideDetailModal();
+                      handleRatePress(selectedTrail);
+                    }}
+                    style={styles.rateButton}
+                    labelStyle={styles.rateButtonLabel}
+                    icon="star"
+                  >
+                    Rate
+                  </Button>
+                </View>
+                
+                <View style={styles.detailLocationRow}>
+                  <Ionicons name="location" size={18} color="#666" />
+                  <Text style={styles.detailLocation}>{selectedTrail.location}</Text>
+                </View>
+                
+                <View style={styles.ratingStatsRow}>
+                  <StarRating rating={selectedTrail.averageRating || 0} size={20} />
+                  <Text style={styles.ratingStatsText}>
+                    {selectedTrail.averageRating ? selectedTrail.averageRating.toFixed(1) : 'No ratings'} 
+                    {selectedTrail.ratingCount ? ` (${selectedTrail.ratingCount} ${selectedTrail.ratingCount === 1 ? 'rating' : 'ratings'})` : ''}
+                  </Text>
+                </View>
+                
+                <View style={styles.detailStatsContainer}>
+                  <View style={styles.detailStat}>
+                    <MaterialCommunityIcons name="arrow-up-bold" size={20} color="#3c6e71" />
+                    <Text style={styles.detailStatValue}>{selectedTrail.elevationGain} m</Text>
+                    <Text style={styles.detailStatLabel}>Elevation</Text>
+                  </View>
+                  
+                  <View style={styles.detailStatDivider} />
+                  
+                  <View style={styles.detailStat}>
+                    <MaterialCommunityIcons name="map-marker-distance" size={20} color="#3c6e71" />
+                    <Text style={styles.detailStatValue}>{selectedTrail.distance} km</Text>
+                    <Text style={styles.detailStatLabel}>Distance</Text>
+                  </View>
+                  
+                  <View style={styles.detailStatDivider} />
+                  
+                  <View style={styles.detailStat}>
+                    <MaterialCommunityIcons name="clock-outline" size={20} color="#3c6e71" />
+                    <Text style={styles.detailStatValue}>{selectedTrail.estimatedTime}</Text>
+                    <Text style={styles.detailStatLabel}>Duration</Text>
+                  </View>
+                </View>
+                
+                <View style={styles.difficultyContainer}>
+                  <Text style={styles.difficultyLabel}>Difficulty:</Text>
+                  <View style={[
+                    styles.difficultyBadgeLarge,
+                    selectedTrail.difficulty.toLowerCase() === 'easy' ? styles.easyBadge : 
+                    selectedTrail.difficulty.toLowerCase() === 'moderate' ? styles.moderateBadge : 
+                    styles.difficultBadge
+                  ]}>
+                    <Text style={[
+                      styles.difficultyTextLarge,
+                      selectedTrail.difficulty.toLowerCase() === 'easy' ? styles.easyText : 
+                      selectedTrail.difficulty.toLowerCase() === 'moderate' ? styles.moderateText : 
+                      styles.difficultText
+                    ]}>
+                      {selectedTrail.difficulty}
+                    </Text>
+                  </View>
+                </View>
+                
+                <Divider style={styles.divider} />
+                
+                <Title style={styles.descriptionTitle}>Description</Title>
+                <Paragraph style={styles.description}>
+                  {selectedTrail.description}
+                </Paragraph>
+                
+                <View style={styles.locationSection}>
+                  <Title style={styles.locationTitle}>Location</Title>
+                  <View style={styles.locationMapPlaceholder}>
+                    <MaterialCommunityIcons name="map" size={40} color="#3c6e71" />
+                    <Text style={styles.mapPlaceholderText}>Map View</Text>
+                    <Text style={styles.coordinatesText}>
+                      Lat: {selectedTrail.coordinates.latitude.toFixed(4)}, 
+                      Long: {selectedTrail.coordinates.longitude.toFixed(4)}
+                    </Text>
+                  </View>
+                </View>
+                
+                <Button 
+                  mode="contained" 
+                  style={styles.viewRouteButton}
+                  icon="map-marker-path"
+                >
+                  View Full Route
+                </Button>
+                
+                <Button 
+                  mode="outlined" 
+                  style={styles.startHikeButton}
+                  icon="shoe-hiking"
+                >
+                  Start Hiking
+                </Button>
+              </ScrollView>
+            </Surface>
+          )}
+        </Modal>
+      </Portal>
+
+      <Portal>
+        <Modal
           visible={ratingModalVisible}
           onDismiss={hideRatingModal}
           contentContainerStyle={styles.modalContainer}
@@ -219,7 +473,7 @@ const TrailsScreen = ({ navigation, setActiveScreen }) => {
             
             <Title style={styles.ratingModalTitle}>Rate this Trail</Title>
             <Image 
-              source={{ uri: selectedTrail?.imageUrl || 'https://via.placeholder.com/400x200?text=No+Image' }}
+              source={getImageSource(selectedTrail)}
               style={styles.ratingModalImage}
               resizeMode="cover"
             />
@@ -321,37 +575,96 @@ const styles = StyleSheet.create({
   activeFilterText: {
     color: '#fff',
   },
+  sectionTitleRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 12,
+  },
   sectionTitle: {
     fontSize: 20,
     fontWeight: 'bold',
     marginBottom: 12,
     color: '#333',
   },
+  featuredChip: {
+    backgroundColor: '#FFF9C4',
+  },
   topRatedSection: {
     marginBottom: 20,
   },
   topRatedCard: {
-    width: 160,
+    width: 200,
+    height: 220,
     marginRight: 12,
     backgroundColor: '#fff',
-    borderRadius: 8,
+    borderRadius: 12,
     overflow: 'hidden',
-    elevation: 2,
+    elevation: 3,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.1,
     shadowRadius: 4,
   },
   topRatedImage: {
-    height: 100,
+    height: 130,
     width: '100%',
   },
+  topRatedOverlay: {
+    position: 'absolute',
+    top: 10,
+    left: 10,
+    backgroundColor: 'rgba(0,0,0,0.6)',
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 4,
+  },
+  topRatedRank: {
+    color: '#fff',
+    fontWeight: 'bold',
+    fontSize: 12,
+  },
+  topRatedContent: {
+    padding: 12,
+  },
   topRatedName: {
-    paddingHorizontal: 10,
-    paddingTop: 8,
-    paddingBottom: 4,
+    fontSize: 16,
+    fontWeight: 'bold',
+    marginBottom: 6,
+    color: '#333',
+  },
+  topRatedRatingRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 8,
+  },
+  topRatedRatingText: {
+    marginLeft: 6,
     fontSize: 14,
     fontWeight: 'bold',
+    color: '#f39c12',
+  },
+  topRatedMeta: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  topRatedDifficulty: {
+    fontSize: 12,
+    fontWeight: 'bold',
+  },
+  easyText: {
+    color: '#38a169',
+  },
+  moderateText: {
+    color: '#dd6b20',
+  },
+  difficultText: {
+    color: '#e53e3e',
+  },
+  topRatedDistance: {
+    fontSize: 12,
+    color: '#666',
   },
   trailsList: {
     paddingBottom: 20,
@@ -371,11 +684,6 @@ const styles = StyleSheet.create({
   trailImage: {
     width: 100,
     height: 100,
-  },
-  placeholderImage: {
-    backgroundColor: '#f1f1f1',
-    justifyContent: 'center',
-    alignItems: 'center',
   },
   trailInfo: {
     flex: 1,
@@ -436,6 +744,7 @@ const styles = StyleSheet.create({
     marginTop: 20,
     color: '#666',
   },
+  
   modalContainer: {
     padding: 20,
     backgroundColor: '#fff',
@@ -485,6 +794,165 @@ const styles = StyleSheet.create({
   submitButton: {
     marginTop: 10,
   },
+  
+  detailModalContainer: {
+    margin: 0,
+    justifyContent: 'flex-end',
+    height: '90%',
+  },
+  detailModalContent: {
+    borderTopLeftRadius: 20,
+    borderTopRightRadius: 20,
+    height: '100%',
+    padding: 0,
+  },
+  detailModalImage: {
+    width: '100%',
+    height: 250,
+  },
+  detailHeaderRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    padding: 16,
+  },
+  detailModalTitle: {
+    fontSize: 24,
+    fontWeight: 'bold',
+    flex: 1,
+  },
+  rateButton: {
+    borderRadius: 20,
+    paddingHorizontal: 10,
+    backgroundColor: '#FFC107',
+  },
+  rateButtonLabel: {
+    fontSize: 14,
+  },
+  detailLocationRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 16,
+    marginBottom: 16,
+  },
+  detailLocation: {
+    fontSize: 16,
+    color: '#666',
+    marginLeft: 8,
+  },
+  ratingStatsRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 16,
+    marginBottom: 20,
+  },
+  ratingStatsText: {
+    marginLeft: 10,
+    fontSize: 16,
+    color: '#666',
+  },
+  detailStatsContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 16,
+    marginBottom: 20,
+    backgroundColor: '#f5f5f5',
+    borderRadius: 8,
+    padding: 12,
+  },
+  detailStat: {
+    alignItems: 'center',
+    flex: 1,
+  },
+  detailStatValue: {
+    fontSize: 16,
+    fontWeight: 'bold',
+    color: '#333',
+    marginVertical: 4,
+  },
+  detailStatLabel: {
+    fontSize: 12,
+    color: '#666',
+  },
+  detailStatDivider: {
+    width: 1,
+    height: 40,
+    backgroundColor: '#ddd',
+  },
+  difficultyContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 16,
+    marginBottom: 20,
+  },
+  difficultyLabel: {
+    fontSize: 16,
+    fontWeight: 'bold',
+    color: '#333',
+    marginRight: 10,
+  },
+  difficultyBadgeLarge: {
+    paddingVertical: 6,
+    paddingHorizontal: 12,
+    borderRadius: 6,
+  },
+  difficultyTextLarge: {
+    fontSize: 14,
+    fontWeight: 'bold',
+  },
+  divider: {
+    marginVertical: 16,
+    marginHorizontal: 16,
+  },
+  descriptionTitle: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    paddingHorizontal: 16,
+    marginBottom: 8,
+  },
+  description: {
+    paddingHorizontal: 16,
+    lineHeight: 22,
+    color: '#333',
+    marginBottom: 20,
+  },
+  locationSection: {
+    paddingHorizontal: 16,
+    marginBottom: 20,
+  },
+  locationTitle: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    marginBottom: 8,
+  },
+  locationMapPlaceholder: {
+    height: 150,
+    backgroundColor: '#eee',
+    borderRadius: 8,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  mapPlaceholderText: {
+    fontSize: 14,
+    color: '#666',
+    marginTop: 8,
+  },
+  coordinatesText: {
+    fontSize: 12,
+    color: '#888',
+    marginTop: 8,
+  },
+  viewRouteButton: {
+    marginHorizontal: 16,
+    marginBottom: 12,
+    borderRadius: 8,
+  },
+  startHikeButton: {
+    marginHorizontal: 16,
+    marginBottom: 30,
+    borderRadius: 8,
+  }
 });
 
 export default TrailsScreen;

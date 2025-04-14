@@ -143,7 +143,7 @@ const TrailCard = ({ trail, onPress, currentUser, refreshTrails }) => {
             
             <Title style={styles.ratingModalTitle}>Rate this Trail</Title>
             <Image 
-              source={{ uri: trail.imageUrl || 'https://via.placeholder.com/400x200?text=No+Image' }}
+              source={{ uri: trail.imageUrl || '../assets/images/adaptive-icon.png' }}
               style={styles.ratingModalImage}
               resizeMode="cover"
             />

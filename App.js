@@ -11,6 +11,7 @@ import RegisterScreen from './components/RegisterScreen';
 import TrailsScreen from './components/TrailsScreen';
 import TrailDetailScreen from './components/TrailDetailScreen';
 import ProfileScreen from './components/ProfileScreen';
+import TrackingScreen from './components/TrackingScreen';
 import { Provider as PaperProvider, DefaultTheme } from 'react-native-paper';
 
 const theme = {
@@ -26,10 +27,11 @@ const theme = {
 };
 
 export default function App() {
-  const [activeScreen, setActiveScreen] = useState('Login');
+  const [activeScreen, setActiveScreen] = useState('Home');
   const [user, setUser] = useState(null);
   const [initializing, setInitializing] = useState(true);
   const [selectedTrailId, setSelectedTrailId] = useState(null);
+  const [selectedTrail, setSelectedTrail] = useState(null);
 
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, (user) => {
@@ -70,6 +72,7 @@ export default function App() {
             <HomeScreen 
               setActiveScreen={setActiveScreen} 
               setSelectedTrailId={setSelectedTrailId}
+              setCurrentTrail={setSelectedTrail}
             />
           );
         case 'About':
@@ -90,8 +93,19 @@ export default function App() {
           );
         case 'Profile':
           return <ProfileScreen setActiveScreen={setActiveScreen} />;
+        case 'Tracking':
+          return (
+            <TrackingScreen 
+              setActiveScreen={setActiveScreen} 
+              currentTrail={selectedTrail}
+            />
+          );
         default:
-          return <HomeScreen setActiveScreen={setActiveScreen} />;
+          return (
+            <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
+              <Text>Screen not found</Text>
+            </View>
+          );
       }
     }
   };

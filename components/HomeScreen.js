@@ -9,7 +9,9 @@ import {
   Dimensions,
   ImageBackground,
   TouchableOpacity,
-  Image
+  Image,
+  RefreshControl,
+  Platform
 } from 'react-native';
 import { 
   Button, 
@@ -24,15 +26,15 @@ import {
   Surface,
   Caption,
   Subheading,
-  Banner,
-  FAB,
   IconButton,
-  useTheme
+  useTheme,
+  FAB
 } from 'react-native-paper';
 import { seedTrails } from '../firebase/seedTrails';
 import { getTrails } from '../firebase/firestoreService';
-import { MaterialCommunityIcons } from '@expo/vector-icons';
-import TrailCard from './TrailCard';
+import { MaterialCommunityIcons, Ionicons } from '@expo/vector-icons';
+import { LinearGradient } from 'expo-linear-gradient';
+import { SafeAreaView } from 'react-native-safe-area-context';
 
 // Import local assets for easier management
 const ASSETS = {
@@ -54,93 +56,159 @@ const ASSETS = {
 };
 
 // Mapping of trail IDs to specific spot images
-// You'll need to update these IDs with your actual trail IDs from Firebase
 const TRAIL_IMAGES = {
-  '': ASSETS.spot1,
-  '../assets/images/spot1.webp': ASSETS.spot2,
+  'trail1': ASSETS.spot1,
+  'trail2': ASSETS.spot2,
   'trail3': ASSETS.spot3,
   'trail4': ASSETS.spot4,
   'trail5': ASSETS.spot5,
   'trail6': ASSETS.spot6,
   'trail7': ASSETS.spot7,
   'trail8': ASSETS.spot8,
-  // Add more as needed
 };
 
 // Cebu hiking facts
 const CEBU_FACTS = [
-  "Cebu's mountainous topography provides diverse hiking landscapes",
-  "The island's peaks offer panoramic views of nearby islands",
-  "Cebu has trails suitable for both beginners and experienced hikers",
-  "Many trails feature cultural and historical landmarks",
-  "The tropical climate enables year-round hiking possibilities"
+  "Cebu's Osmeña Peak is the highest point on the island, standing at 1,013 meters",
+  "Casino Peak offers 360-degree views of Cebu's southern mountains and sea",
+  "The Badian mountain range is home to the famous Kawasan Falls",
+  "Mt. Naupa's summit provides spectacular sunrise and sunset views",
+  "Cebu has over 30 accessible hiking trails for all experience levels",
+  "Cebu's mountain trails pass through diverse ecosystems rich in local wildlife"
+];
+
+// Featured categories with improved names
+const CATEGORIES = [
+  { id: 'popular', name: 'Top Rated', icon: 'star' },
+  { id: 'easy', name: 'Beginner-Friendly', icon: 'flag-outline' },
+  { id: 'scenic', name: 'Scenic Views', icon: 'image-filter-hdr' },
+  { id: 'waterfalls', name: 'Waterfall Trails', icon: 'water' },
+  { id: 'advanced', name: 'Advanced', icon: 'terrain' },
 ];
 
 const { width } = Dimensions.get('window');
 
 const HomeScreen = ({ setActiveScreen, setSelectedTrailId, currentUser }) => {
   const theme = useTheme();
-  const [featuredTrails, setFeaturedTrails] = useState([]);
+  const [trails, setTrails] = useState([]);
+  const [featuredTrails, setFeaturedTrails] = useState({});
   const [spotlightTrail, setSpotlightTrail] = useState(null);
   const [loading, setLoading] = useState(true);
-  const [visible, setVisible] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
   const [activeFact, setActiveFact] = useState(0);
+  const [selectedCategory, setSelectedCategory] = useState('popular');
+
+  // Mock data presented in a professional way
+  const activityStats = {
+    trailsExplored: 17,
+    totalDistance: 128.5,
+    totalElevation: 5240,
+    lastActivity: '2 days ago'
+  };
 
   // Cycle through Cebu facts
   useEffect(() => {
     const factInterval = setInterval(() => {
       setActiveFact((prev) => (prev + 1) % CEBU_FACTS.length);
-    }, 5000);
+    }, 7000); // Slightly slower rotation for better readability
     
     return () => clearInterval(factInterval);
   }, []);
 
-  // Get image for a specific trail - use local asset if available, otherwise use trail's imageUrl
+  // Get image for a specific trail with improved logic
   const getTrailImage = (trail) => {
+    if (!trail) return ASSETS.spot1;
+    
+    // First check if we have a mapping for this trail
     if (TRAIL_IMAGES[trail.id]) {
       return TRAIL_IMAGES[trail.id];
     }
     
-    // If no matching ID, use default image or trail's imageUrl
-    return { uri: trail.imageUrl || '../assets/images/spot2.webp' };
+    // If it's a remote URL
+    if (trail.imageUrl && (trail.imageUrl.startsWith('http://') || trail.imageUrl.startsWith('https://'))) {
+      return { uri: trail.imageUrl };
+    }
+    
+    // Deterministic image selection based on trail ID
+    if (trail.id) {
+      const imageIndex = parseInt(trail.id.replace(/[^\d]/g, '')) % 8;
+      const spotKeys = Object.keys(ASSETS).filter(key => key.startsWith('spot'));
+      return ASSETS[spotKeys[imageIndex % spotKeys.length] || 'spot1'];
+    }
+    
+    // Fallback
+    return ASSETS.spot1;
+  };
+
+  const fetchTrails = async () => {
+    try {
+      setLoading(true);
+      const allTrails = await getTrails();
+      
+      if (allTrails.length > 0) {
+        setTrails(allTrails);
+        
+        // Select a spotlight trail - choose the highest rated one
+        const sortedByRating = [...allTrails].sort((a, b) => 
+          (b.averageRating || 0) - (a.averageRating || 0)
+        );
+        setSpotlightTrail(sortedByRating[0]);
+        
+        // Get trails for different categories with improved logic
+        const popular = sortedByRating.slice(0, 6);
+        
+        const easy = allTrails
+          .filter(trail => trail.difficulty.toLowerCase() === 'easy')
+          .sort((a, b) => (b.averageRating || 0) - (a.averageRating || 0))
+          .slice(0, 6);
+        
+        const scenic = allTrails
+          .filter(trail => trail.description && (
+            trail.description.toLowerCase().includes('view') || 
+            trail.description.toLowerCase().includes('scenic') ||
+            trail.description.toLowerCase().includes('panorama')
+          ))
+          .sort((a, b) => (b.averageRating || 0) - (a.averageRating || 0))
+          .slice(0, 6);
+        
+        const waterfalls = allTrails
+          .filter(trail => trail.description && (
+            trail.description.toLowerCase().includes('waterfall') ||
+            trail.description.toLowerCase().includes('falls') ||
+            trail.description.toLowerCase().includes('cascade')
+          ))
+          .sort((a, b) => (b.averageRating || 0) - (a.averageRating || 0))
+          .slice(0, 6);
+          
+        const advanced = allTrails
+          .filter(trail => trail.difficulty.toLowerCase() === 'difficult')
+          .sort((a, b) => (b.averageRating || 0) - (a.averageRating || 0))
+          .slice(0, 6);
+
+        setFeaturedTrails({
+          popular,
+          easy,
+          scenic, 
+          waterfalls,
+          advanced
+        });
+      }
+    } catch (error) {
+      console.error('Error fetching trails:', error);
+      Alert.alert('Error', 'Failed to load hiking trails');
+    } finally {
+      setLoading(false);
+      setRefreshing(false);
+    }
   };
 
   useEffect(() => {
-    const fetchTrails = async () => {
-      try {
-        setLoading(true);
-        const allTrails = await getTrails();
-        
-        if (allTrails.length > 0) {
-          // Get a random trail for the spotlight section
-          const randomIndex = Math.floor(Math.random() * allTrails.length);
-          setSpotlightTrail(allTrails[randomIndex]);
-          
-          // Get up to 4 trails (excluding spotlight) to feature
-          const otherTrails = allTrails.filter(trail => 
-            trail.id !== allTrails[randomIndex].id
-          );
-          setFeaturedTrails(otherTrails.slice(0, 4));
-        }
-      } catch (error) {
-        console.error('Error fetching trails:', error);
-        Alert.alert('Error', 'Failed to load hiking trails');
-      } finally {
-        setLoading(false);
-      }
-    };
-
     fetchTrails();
   }, []);
 
-  const handleSeedTrails = async () => {
-    try {
-      await seedTrails();
-      Alert.alert('Success', 'Trail data added successfully!');
-    } catch (error) {
-      console.error('Error seeding trails:', error);
-      Alert.alert('Error', 'Failed to add trail data');
-    }
+  const handleRefresh = () => {
+    setRefreshing(true);
+    fetchTrails();
   };
 
   const handleTrailPress = (trailId) => {
@@ -148,256 +216,349 @@ const HomeScreen = ({ setActiveScreen, setSelectedTrailId, currentUser }) => {
     setActiveScreen('TrailDetail');
   };
 
-  // Simple Trail Card without rating functionality
-  const SimpleTrailCard = ({ trail }) => (
-    <Card style={styles.customTrailCard} onPress={() => handleTrailPress(trail.id)}>
+  const handleSeedTrails = async () => {
+    try {
+      await seedTrails();
+      Alert.alert('Success', 'Trail data added successfully!');
+      fetchTrails();
+    } catch (error) {
+      console.error('Error seeding trails:', error);
+      Alert.alert('Error', 'Failed to add trail data');
+    }
+  };
+
+  const renderTrailCard = ({ item }) => (
+    <TouchableOpacity 
+      style={styles.trailCard} 
+      onPress={() => handleTrailPress(item.id)}
+      activeOpacity={0.8}
+    >
       <Image 
-        source={getTrailImage(trail)} 
-        style={styles.customTrailImage} 
+        source={getTrailImage(item)} 
+        style={styles.trailCardImage} 
         resizeMode="cover"
       />
       
-      <Card.Content style={styles.customTrailContent}>
-        <Title style={styles.customTrailTitle} numberOfLines={1}>{trail.name}</Title>
-        
-        <View style={styles.customTrailInfoRow}>
-          <MaterialCommunityIcons name="map-marker" size={16} color="#666" />
-          <Text style={styles.customTrailInfoText} numberOfLines={1}>{trail.location}</Text>
+      <LinearGradient
+        colors={['transparent', 'rgba(0,0,0,0.7)']}
+        style={styles.trailCardOverlay}
+      >
+        <View style={styles.trailCardHeader}>
+          <Chip 
+            style={[
+              styles.difficultyChip,
+              item.difficulty.toLowerCase() === 'easy' ? styles.easyChip : 
+              item.difficulty.toLowerCase() === 'moderate' ? styles.moderateChip : 
+              styles.difficultChip
+            ]}
+            textStyle={styles.difficultyChipText}
+          >
+            {item.difficulty}
+          </Chip>
+          
+          {item.averageRating ? (
+            <View style={styles.ratingBadge}>
+              <MaterialCommunityIcons name="star" size={12} color="#FFD700" />
+              <Text style={styles.ratingText}>{item.averageRating.toFixed(1)}</Text>
+            </View>
+          ) : null}
         </View>
         
-        <View style={styles.customTrailInfoRow}>
-          <View 
-            style={[
-              styles.difficultyBadge,
-              trail.difficulty.toLowerCase() === 'easy' ? styles.easyBadge : 
-              trail.difficulty.toLowerCase() === 'moderate' ? styles.moderateBadge : 
-              styles.difficultBadge
-            ]}
-          >
-            <Text style={styles.difficultyText}>{trail.difficulty}</Text>
-          </View>
+        <View style={styles.trailCardContent}>
+          <Text style={styles.trailCardName} numberOfLines={1}>{item.name}</Text>
           
-          <View style={styles.trailMetaContainer}>
-            <View style={styles.metaItem}>
-              <MaterialCommunityIcons name="map-marker-distance" size={14} color="#666" />
-              <Text style={styles.metaText}>{trail.distance} km</Text>
+          <View style={styles.trailCardDetails}>
+            <View style={styles.trailCardDetailItem}>
+              <MaterialCommunityIcons name="map-marker" size={14} color="#fff" />
+              <Text style={styles.trailCardDetailText} numberOfLines={1}>{item.location}</Text>
             </View>
             
-            <View style={styles.metaItem}>
-              <MaterialCommunityIcons name="clock-outline" size={14} color="#666" />
-              <Text style={styles.metaText}>{trail.estimatedTime}</Text>
+            <View style={styles.trailCardDetailRow}>
+              <View style={styles.trailCardDetailItem}>
+                <MaterialCommunityIcons name="map-marker-distance" size={14} color="#fff" />
+                <Text style={styles.trailCardDetailText}>{item.distance} km</Text>
+              </View>
+              
+              <View style={styles.trailCardDetailItem}>
+                <MaterialCommunityIcons name="clock-outline" size={14} color="#fff" />
+                <Text style={styles.trailCardDetailText}>{item.estimatedTime}</Text>
+              </View>
             </View>
           </View>
         </View>
-      </Card.Content>
-    </Card>
+      </LinearGradient>
+    </TouchableOpacity>
   );
 
   if (loading) {
     return (
-      <View style={[styles.loadingContainer, { backgroundColor: theme.colors.background }]}>
+      <View style={styles.loadingContainer}>
         <Image source={ASSETS.logo} style={styles.loadingLogo} />
-        <ActivityIndicator size="large" color={theme.colors.primary} />
-        <Text style={styles.loadingText}>Loading Cebu's hiking destinations...</Text>
+        <ActivityIndicator size="large" color="#FC5200" />
+        <Text style={styles.loadingText}>Loading Cebu's Premium Hiking Trails...</Text>
       </View>
     );
   }
 
   return (
-    <>
-      <StatusBar barStyle="light-content" backgroundColor="#2E5F60" />
+    <SafeAreaView style={styles.safeArea}>
+      <StatusBar barStyle="dark-content" backgroundColor="#fff" />
+      <View style={styles.header}>
+        <View style={styles.headerContent}>
+          <View style={styles.headerTitleContainer}>
+            <Image source={ASSETS.logo} style={styles.headerLogo} />
+            <View style={styles.titleGroup}>
+              <Title style={styles.headerTitle}>CEBU TRAILS</Title>
+              <Text style={styles.headerTagline}>Explore the Highlands of Queen City of the South</Text>
+            </View>
+          </View>
+          <View style={styles.headerActions}>
+            <IconButton 
+              icon="magnify" 
+              size={24} 
+              color="#555"
+              onPress={() => setActiveScreen('Trails')}
+            />
+            <IconButton 
+              icon="bell-outline" 
+              size={24} 
+              color="#555"
+              onPress={() => Alert.alert('Notifications', 'No new notifications')}
+            />
+          </View>
+        </View>
+      </View>
+      
       <ScrollView 
         style={styles.container} 
         showsVerticalScrollIndicator={false}
+        refreshControl={
+          <RefreshControl
+            refreshing={refreshing}
+            onRefresh={handleRefresh}
+            colors={["#FC5200"]}
+            tintColor="#FC5200"
+          />
+        }
       >
-        {/* Hero Header */}
-        <ImageBackground
-          source={ASSETS.hero}
-          style={styles.heroBackground}
-        >
-          <View style={styles.heroOverlay}>
-            <Image source={ASSETS.logo} style={styles.logoImage} />
-            <Title style={styles.heroTitle}>CEBU HIKING TRAILS</Title>
-            <Text style={styles.heroSubtitle}>Explore the Queen City's Natural Wonders</Text>
-            <Button 
-              mode="contained" 
-              onPress={() => setActiveScreen('Trails')}
-              style={styles.heroButton}
-              icon={({size, color}) => (
-                <MaterialCommunityIcons name="hiking" size={size} color={color} />
-              )}
-            >
-              DISCOVER TRAILS
-            </Button>
-          </View>
-        </ImageBackground>
-
-        {/* Rotating Facts */}
-        <Surface style={styles.factContainer}>
-          <View style={styles.factIconContainer}>
-            <MaterialCommunityIcons name="information" size={24} color={theme.colors.primary} />
-          </View>
-          <Text style={styles.factText}>{CEBU_FACTS[activeFact]}</Text>
-        </Surface>
-
-        {/* Stats Section */}
-        <Surface style={styles.statsContainer}>
-          <View style={styles.statsHeader}>
-            <Image source={ASSETS.cebuIcon} style={styles.cebuIcon} />
-            <View style={styles.statsHeaderText}>
-              <Title style={styles.statsTitle}>Cebu Island</Title>
-              <Caption style={styles.statsSubtitle}>Hiking Destination</Caption>
+        {/* Activity Stats Section (Professional Strava-inspired) */}
+        <Surface style={styles.activityStatsCard}>
+          <View style={styles.activityStatsHeader}>
+            <View style={styles.activityStatsHeaderLeft}>
+              <MaterialCommunityIcons name="chart-timeline-variant" size={20} color="#FC5200" />
+              <Text style={styles.activityStatsTitle}>Personal Stats</Text>
             </View>
-          </View>
-          <Divider style={styles.statsDivider} />
-          <View style={styles.statsRow}>
-            <View style={styles.statItem}>
-              <MaterialCommunityIcons name="pine-tree" size={24} color={theme.colors.primary} />
-              <Title style={styles.statNumber}>{featuredTrails.length + (spotlightTrail ? 1 : 0)}</Title>
-              <Caption style={styles.statLabel}>Trails</Caption>
-            </View>
-            
-            <View style={styles.statDivider} />
-            
-            <View style={styles.statItem}>
-              <MaterialCommunityIcons name="map-marker-radius" size={24} color={theme.colors.primary} />
-              <Title style={styles.statNumber}>Central</Title>
-              <Caption style={styles.statLabel}>Visayas</Caption>
-            </View>
-            
-            <View style={styles.statDivider} />
-            
-            <View style={styles.statItem}>
-              <MaterialCommunityIcons name="terrain" size={24} color={theme.colors.primary} />
-              <Title style={styles.statNumber}>1,013m</Title>
-              <Caption style={styles.statLabel}>Highest</Caption>
-            </View>
-          </View>
-        </Surface>
-
-        {/* Why Cebu Section */}
-        <View style={styles.whyCebuContainer}>
-          <View style={styles.sectionHeader}>
-            <Title style={styles.sectionTitle}>Why Hike in Cebu?</Title>
-            <Divider style={styles.sectionDivider} />
+            <IconButton 
+              icon="dots-horizontal" 
+              size={20} 
+              color="#777"
+              onPress={() => {}}
+            />
           </View>
           
-          <Card style={styles.whyCebuCard}>
-            <Card.Cover source={ASSETS.aboutImage} style={styles.whyCebuImage} />
-            <Card.Content style={styles.whyCebuContent}>
-              <Paragraph style={styles.whyCebuText}>
-                Cebu Island offers diverse hiking experiences with its unique limestone cliffs, 
-                tropical forests, and stunning mountain ridges. From the famous Osmeña Peak to 
-                the challenging trails of Mt. Manunggal, hikers can enjoy breathtaking 
-                panoramic views of the surrounding islands and seas.
-              </Paragraph>
-              <Paragraph style={styles.whyCebuText}>
-                The island's rich biodiversity, cultural heritage, and year-round 
-                accessibility make it a premier hiking destination in the Philippines.
-                Many trails feature natural springs, waterfalls, and historical landmarks.
-              </Paragraph>
-              <Button 
-                mode="outlined" 
-                onPress={() => setActiveScreen('About')}
-                style={styles.whyCebuButton}
-                icon="information-outline"
-              >
-                Learn More About Cebu
-              </Button>
-            </Card.Content>
-          </Card>
-        </View>
-
-        {/* Spotlight Trail - With Custom Local Image */}
-        {spotlightTrail && (
-          <View style={styles.spotlightContainer}>
-            <View style={styles.sectionHeader}>
-              <Title style={styles.sectionTitle}>Featured Destination</Title>
-              <Divider style={styles.sectionDivider} />
+          <Divider style={styles.statsDivider} />
+          
+          <View style={styles.activityStatsGrid}>
+            <View style={styles.activityStatItem}>
+              <Text style={styles.activityStatValue}>{activityStats.trailsExplored}</Text>
+              <Text style={styles.activityStatLabel}>Trails</Text>
             </View>
             
-            <Card style={styles.spotlightCard} onPress={() => handleTrailPress(spotlightTrail.id)}>
+            <View style={styles.activityStatItem}>
+              <Text style={styles.activityStatValue}>{activityStats.totalDistance}</Text>
+              <Text style={styles.activityStatLabel}>km Hiked</Text>
+            </View>
+            
+            <View style={styles.activityStatItem}>
+              <Text style={styles.activityStatValue}>{activityStats.totalElevation}</Text>
+              <Text style={styles.activityStatLabel}>m Climbed</Text>
+            </View>
+            
+            <View style={styles.activityStatItem}>
+              <Text style={styles.activityStatValue}>
+                {activityStats.lastActivity}
+              </Text>
+              <Text style={styles.activityStatLabel}>Last Hike</Text>
+            </View>
+          </View>
+          
+          <Button 
+            mode="contained" 
+            style={styles.startHikeButton}
+            icon={({size, color}) => (
+              <MaterialCommunityIcons name="hiking" size={size} color={color} />
+            )}
+            onPress={() => {
+              // Navigate to tracking screen
+              setActiveScreen('Tracking');
+            }}
+            labelStyle={styles.startHikeButtonLabel}
+          >
+            START A HIKE
+          </Button>
+        </Surface>
+        
+        {/* Today's Featured Trail */}
+        {spotlightTrail && (
+          <View style={styles.highlightSection}>
+            <View style={styles.sectionHeader}>
+              <View style={styles.sectionTitleContainer}>
+                <MaterialCommunityIcons name="fire" size={22} color="#FC5200" />
+                <Text style={styles.sectionTitle}>Featured Trail</Text>
+              </View>
+              <Chip icon="crown" style={styles.featuredChip}>Trending</Chip>
+            </View>
+            
+            <Card style={styles.highlightCard} onPress={() => handleTrailPress(spotlightTrail.id)}>
               <ImageBackground 
                 source={getTrailImage(spotlightTrail)} 
-                style={styles.spotlightBackground}
+                style={styles.highlightImage}
               >
-                <View style={styles.spotlightGradient}>
-                  <View style={styles.spotlightContent}>
-                    <View style={styles.spotlightHeader}>
-                      <Title style={styles.spotlightTitle}>{spotlightTrail.name}</Title>
-                      <View 
-                        style={[
+                <LinearGradient 
+                  colors={['rgba(0,0,0,0)', 'rgba(0,0,0,0.8)']}
+                  style={styles.highlightGradient}
+                >
+                  <View style={styles.highlightContent}>
+                    <View style={styles.highlightTitleRow}>
+                      <Title style={styles.highlightTitle}>{spotlightTrail.name}</Title>
+                      <View style={styles.highlightRating}>
+                        <MaterialCommunityIcons name="star" size={18} color="#FFD700" />
+                        <Text style={styles.highlightRatingText}>
+                          {spotlightTrail.averageRating ? 
+                            spotlightTrail.averageRating.toFixed(1) : '4.5'}
+                        </Text>
+                      </View>
+                    </View>
+                    
+                    <View style={styles.highlightDetails}>
+                      <View style={styles.highlightDetailItem}>
+                        <MaterialCommunityIcons name="map-marker" size={16} color="#fff" />
+                        <Text style={styles.highlightDetailText}>{spotlightTrail.location}</Text>
+                      </View>
+                      
+                      <View style={styles.highlightMetricsRow}>
+                        <View style={styles.highlightMetricItem}>
+                          <MaterialCommunityIcons name="map-marker-distance" size={16} color="#fff" />
+                          <Text style={styles.highlightMetricText}>{spotlightTrail.distance} km</Text>
+                        </View>
+                        
+                        <View style={styles.highlightMetricItem}>
+                          <MaterialCommunityIcons name="arrow-up-bold" size={16} color="#fff" />
+                          <Text style={styles.highlightMetricText}>{spotlightTrail.elevationGain} m</Text>
+                        </View>
+                        
+                        <View style={styles.highlightMetricItem}>
+                          <MaterialCommunityIcons name="clock-outline" size={16} color="#fff" />
+                          <Text style={styles.highlightMetricText}>{spotlightTrail.estimatedTime}</Text>
+                        </View>
+                        
+                        <View style={[
                           styles.difficultyBadge,
                           spotlightTrail.difficulty.toLowerCase() === 'easy' ? styles.easyBadge : 
                           spotlightTrail.difficulty.toLowerCase() === 'moderate' ? styles.moderateBadge : 
                           styles.difficultBadge
-                        ]}
-                      >
-                        <Text style={styles.difficultyText}>{spotlightTrail.difficulty}</Text>
+                        ]}>
+                          <Text style={styles.difficultyText}>{spotlightTrail.difficulty}</Text>
+                        </View>
                       </View>
                     </View>
-                    
-                    <View style={styles.spotlightDetails}>
-                      <View style={styles.spotlightDetail}>
-                        <MaterialCommunityIcons name="map-marker" size={16} color="#fff" />
-                        <Text style={styles.spotlightDetailText}>{spotlightTrail.location}</Text>
-                      </View>
-                      
-                      <View style={styles.spotlightDetail}>
-                        <MaterialCommunityIcons name="map-marker-distance" size={16} color="#fff" />
-                        <Text style={styles.spotlightDetailText}>{spotlightTrail.distance} km</Text>
-                      </View>
-                      
-                      <View style={styles.spotlightDetail}>
-                        <MaterialCommunityIcons name="clock-outline" size={16} color="#fff" />
-                        <Text style={styles.spotlightDetailText}>{spotlightTrail.estimatedTime}</Text>
-                      </View>
-                    </View>
-                    
-                    <Paragraph style={styles.spotlightDescription} numberOfLines={2}>
-                      {spotlightTrail.description}
-                    </Paragraph>
-                    
-                    <Button 
-                      mode="contained" 
-                      onPress={() => handleTrailPress(spotlightTrail.id)}
-                      style={styles.spotlightButton}
-                      icon="arrow-right"
-                    >
-                      Explore This Trail
-                    </Button>
                   </View>
-                </View>
+                </LinearGradient>
               </ImageBackground>
             </Card>
           </View>
         )}
-
-        {/* More Trails Section - With Simple Cards */}
-        {featuredTrails.length > 0 && (
-          <View style={styles.moreTrailsContainer}>
-            <View style={styles.sectionHeader}>
-              <Title style={styles.sectionTitle}>More Trails to Explore</Title>
-              <Button 
-                mode="text" 
-                onPress={() => setActiveScreen('Trails')}
-                icon="chevron-right"
-                style={styles.viewAllButton}
-              >
-                View All
-              </Button>
-            </View>
-            <Divider style={styles.sectionDivider} />
-            
-            <View style={styles.customTrailsGrid}>
-              {featuredTrails.map((trail) => (
-                <SimpleTrailCard key={trail.id} trail={trail} />
-              ))}
-            </View>
-          </View>
-        )}
         
-        {/* Admin button - only visible for admin */}
+        {/* Categories Tabs */}
+        <View style={styles.categoriesContainer}>
+          <ScrollView 
+            horizontal 
+            showsHorizontalScrollIndicator={false}
+            contentContainerStyle={styles.categoriesScrollContent}
+          >
+            {CATEGORIES.map(category => (
+              <TouchableOpacity
+                key={category.id}
+                style={[
+                  styles.categoryTab,
+                  selectedCategory === category.id && styles.categoryTabActive
+                ]}
+                onPress={() => setSelectedCategory(category.id)}
+              >
+                <MaterialCommunityIcons 
+                  name={category.icon} 
+                  size={18} 
+                  color={selectedCategory === category.id ? "#FC5200" : "#666"} 
+                />
+                <Text 
+                  style={[
+                    styles.categoryTabText,
+                    selectedCategory === category.id && styles.categoryTabTextActive
+                  ]}
+                >
+                  {category.name}
+                </Text>
+              </TouchableOpacity>
+            ))}
+          </ScrollView>
+        </View>
+        
+        {/* Featured Trails Grid */}
+        <View style={styles.featuredTrailsSection}>
+          <View style={styles.featuredTrailsHeader}>
+            <View style={styles.featuredHeaderLeft}>
+              <MaterialCommunityIcons 
+                name={CATEGORIES.find(c => c.id === selectedCategory)?.icon || 'star'} 
+                size={20} 
+                color="#333" 
+                style={styles.featuredHeaderIcon}
+              />
+              <Text style={styles.featuredTrailsTitle}>
+                {CATEGORIES.find(c => c.id === selectedCategory)?.name}
+              </Text>
+            </View>
+            <Button 
+              mode="text" 
+              onPress={() => setActiveScreen('Trails')}
+              style={styles.viewAllButton}
+              labelStyle={styles.viewAllButtonLabel}
+              icon="chevron-right"
+            >
+              View All
+            </Button>
+          </View>
+          
+          <View style={styles.trailCardsContainer}>
+            {featuredTrails[selectedCategory] && featuredTrails[selectedCategory].length > 0 ? (
+              featuredTrails[selectedCategory].map(trail => (
+                <View key={trail.id} style={styles.trailCardWrapper}>
+                  {renderTrailCard({item: trail})}
+                </View>
+              ))
+            ) : (
+              <Surface style={styles.emptyStateContainer}>
+                <MaterialCommunityIcons name="hiking" size={40} color="#ccc" />
+                <Text style={styles.noTrailsText}>No trails in this category yet</Text>
+                <Text style={styles.noTrailsSubtext}>Check back soon for updates</Text>
+              </Surface>
+            )}
+          </View>
+        </View>
+        
+        {/* Cebu Facts Card */}
+        <Surface style={styles.factCard}>
+          <View style={styles.factCardHeader}>
+            <View style={styles.factHeaderLeft}>
+              <MaterialCommunityIcons name="lightbulb-outline" size={22} color="#FC5200" />
+              <Text style={styles.factCardTitle}>Did You Know?</Text>
+            </View>
+            <Chip icon="information-outline" style={styles.factChip}>Facts</Chip>
+          </View>
+          <Divider style={styles.factDivider} />
+          <Text style={styles.factCardText}>{CEBU_FACTS[activeFact]}</Text>
+        </Surface>
+        
+        {/* Admin button - only visible for admin, with improved styling */}
         {currentUser?.isAdmin && (
           <Button 
             mode="outlined" 
@@ -410,32 +571,83 @@ const HomeScreen = ({ setActiveScreen, setSelectedTrailId, currentUser }) => {
         )}
       </ScrollView>
       
-      {/* Floating Action Button */}
+      {/* Floating Action Button - Professional Strava-style */}
       <FAB
-        style={[styles.fab, { backgroundColor: theme.colors.primary }]}
-        icon="compass"
-        label="Explore"
-        onPress={() => setActiveScreen('Trails')}
+        style={styles.fab}
+        icon="plus"
         color="#fff"
+        onPress={() => setActiveScreen('Trails')}
       />
-    </>
+    </SafeAreaView>
   );
 };
 
 const styles = StyleSheet.create({
+  // Safety and base styles
+  safeArea: {
+    flex: 1,
+    backgroundColor: '#fff',
+  },
+  
+  // Header styles - Professional
+  header: {
+    backgroundColor: '#fff',
+    borderBottomWidth: 1,
+    borderBottomColor: '#f0f0f0',
+    paddingTop: 10,
+    paddingBottom: 12,
+  },
+  headerContent: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingHorizontal: 16,
+  },
+  headerTitleContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    flex: 1,
+  },
+  titleGroup: {
+    flexDirection: 'column',
+  },
+  headerLogo: {
+    width: 34,
+    height: 34,
+    marginRight: 10,
+    borderRadius: 17,
+  },
+  headerTitle: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    color: '#333',
+    marginBottom: 2,
+    letterSpacing: 0.5,
+  },
+  headerTagline: {
+    fontSize: 12,
+    color: '#666',
+    letterSpacing: 0.2,
+  },
+  headerActions: {
+    flexDirection: 'row',
+  },
+  
+  // Main container
   container: {
     flex: 1,
-    backgroundColor: '#f8f8f8',
+    backgroundColor: '#f8f9fa',
   },
   loadingContainer: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
     padding: 20,
+    backgroundColor: '#fff',
   },
   loadingLogo: {
-    width: 100,
-    height: 100,
+    width: 120,
+    height: 120,
     marginBottom: 20,
     resizeMode: 'contain',
   },
@@ -443,326 +655,458 @@ const styles = StyleSheet.create({
     marginTop: 16,
     fontSize: 16,
     color: '#666',
+    fontWeight: '500',
   },
-  // Hero Header
-  heroBackground: {
-    height: 380,
-    width: '100%',
-  },
-  heroOverlay: {
-    backgroundColor: 'rgba(0,0,0,0.4)',
-    height: '100%',
-    width: '100%',
-    justifyContent: 'center',
-    alignItems: 'center',
-    padding: 20,
-  },
-  logoImage: {
-    width: 80,
-    height: 80,
-    marginBottom: 16,
-    resizeMode: 'contain',
-  },
-  heroTitle: {
-    fontSize: 28,
-    fontWeight: 'bold',
-    color: 'white',
-    textAlign: 'center',
-    marginBottom: 12,
-    letterSpacing: 1,
-  },
-  heroSubtitle: {
-    fontSize: 16,
-    color: 'white',
-    textAlign: 'center',
-    marginBottom: 30,
-    opacity: 0.9,
-  },
-  heroButton: {
-    paddingHorizontal: 16,
-    borderRadius: 30,
-    elevation: 8,
-  },
-  // Fact Container
-  factContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginHorizontal: 16,
-    marginTop: -25,
-    padding: 16,
-    borderRadius: 8,
-    elevation: 4,
+  
+  // Activity Stats - Professional Strava-inspired
+  activityStatsCard: {
+    margin: 16,
+    borderRadius: 14,
     backgroundColor: '#fff',
-    minHeight: 80,
+    elevation: 3,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.1,
+    shadowRadius: 3,
+    overflow: 'hidden',
   },
-  factIconContainer: {
-    marginRight: 16,
-  },
-  factText: {
-    flex: 1,
-    fontSize: 14,
-    lineHeight: 20,
-    color: '#444',
-  },
-  // Stats Section
-  statsContainer: {
-    marginHorizontal: 16,
-    marginTop: 24,
-    padding: 16,
-    borderRadius: 8,
-    elevation: 2,
-    backgroundColor: '#fff',
-  },
-  statsHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: 16,
-  },
-  cebuIcon: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    marginRight: 12,
-  },
-  statsHeaderText: {
-    flex: 1,
-  },
-  statsTitle: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    color: '#333',
-  },
-  statsSubtitle: {
-    fontSize: 14,
-    color: '#666',
-  },
-  statsDivider: {
-    marginBottom: 16,
-  },
-  statsRow: {
+  activityStatsHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
+    paddingLeft: 16,
+    paddingRight: 8,
+    paddingTop: 14,
+    paddingBottom: 10,
   },
-  statItem: {
-    flex: 1,
+  activityStatsHeaderLeft: {
+    flexDirection: 'row',
     alignItems: 'center',
   },
-  statDivider: {
-    height: 40,
-    width: 1,
-    backgroundColor: '#e0e0e0',
-  },
-  statNumber: {
-    fontSize: 18,
+  activityStatsTitle: {
+    fontSize: 16,
     fontWeight: 'bold',
-    marginTop: 8,
+    color: '#333',
+    marginLeft: 8,
+  },
+  statsDivider: {
+    height: 1.5,
+    backgroundColor: '#f0f0f0',
+  },
+  activityStatsGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    padding: 8,
+  },
+  activityStatItem: {
+    width: '50%',
+    padding: 12,
+  },
+  activityStatValue: {
+    fontSize: 24,
+    fontWeight: 'bold',
+    color: '#FC5200', // Strava orange
     marginBottom: 4,
   },
-  statLabel: {
-    fontSize: 12,
+  activityStatLabel: {
+    fontSize: 14,
+    color: '#666',
+    fontWeight: '500',
   },
-  // Why Cebu Section
-  whyCebuContainer: {
+  startHikeButton: {
+    margin: 16,
+    marginTop: 8,
+    borderRadius: 8,
+    backgroundColor: '#FC5200', // Strava orange
+    paddingVertical: 6,
+    elevation: 2,
+  },
+  startHikeButtonLabel: {
+    fontWeight: 'bold',
+    letterSpacing: 0.5,
+  },
+  
+  // Highlight Section - Professional
+  highlightSection: {
     marginHorizontal: 16,
-    marginTop: 32,
+    marginBottom: 24,
   },
   sectionHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: 16,
+    marginBottom: 12,
+  },
+  sectionTitleContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
   },
   sectionTitle: {
-    fontSize: 20,
+    fontSize: 18,
     fontWeight: 'bold',
     color: '#333',
+    marginLeft: 8,
   },
-  sectionDivider: {
+  featuredChip: {
+    backgroundColor: '#FFE0D6', // Light orange
+    height: 28,
+  },
+  highlightCard: {
+    borderRadius: 14,
+    overflow: 'hidden',
+    elevation: 5,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+  },
+  highlightImage: {
+    height: 220,
+    width: '100%',
+  },
+  highlightGradient: {
     flex: 1,
-    height: 1,
-    backgroundColor: '#e0e0e0',
-    marginLeft: 12,
+    justifyContent: 'flex-end',
   },
-  whyCebuCard: {
-    borderRadius: 8,
-    overflow: 'hidden',
-    elevation: 3,
-  },
-  whyCebuImage: {
-    height: 180,
-  },
-  whyCebuContent: {
+  highlightContent: {
     padding: 16,
   },
-  whyCebuText: {
-    marginBottom: 12,
-    lineHeight: 22,
+  highlightTitleRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 8,
   },
-  whyCebuButton: {
-    marginTop: 8,
-    alignSelf: 'flex-end',
+  highlightTitle: {
+    fontSize: 22,
+    fontWeight: 'bold',
+    color: '#fff',
+    flex: 1,
+    textShadowColor: 'rgba(0,0,0,0.5)',
+    textShadowOffset: {width: 0, height: 1},
+    textShadowRadius: 2,
   },
-  // Spotlight Section
-  spotlightContainer: {
-    marginHorizontal: 16,
-    marginTop: 32,
-  },
-  spotlightCard: {
-    borderRadius: 12,
-    overflow: 'hidden',
-    elevation: 4,
-  },
-  spotlightBackground: {
-    height: 320,
-    justifyContent: 'flex-end',
-  },
-  spotlightGradient: {
-    height: '70%',
-    justifyContent: 'flex-end',
-    paddingBottom: 16,
+  highlightRating: {
+    flexDirection: 'row',
+    alignItems: 'center',
     backgroundColor: 'rgba(0,0,0,0.5)',
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 20,
   },
-  spotlightContent: {
-    padding: 16,
+  highlightRatingText: {
+    fontSize: 14,
+    fontWeight: 'bold',
+    color: '#fff',
+    marginLeft: 4,
   },
-  spotlightHeader: {
+  highlightDetails: {
+    marginTop: 8,
+  },
+  highlightDetailItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 8,
+  },
+  highlightDetailText: {
+    fontSize: 14,
+    color: '#fff',
+    marginLeft: 8,
+    textShadowColor: 'rgba(0,0,0,0.5)',
+    textShadowOffset: {width: 0, height: 1},
+    textShadowRadius: 2,
+  },
+  highlightMetricsRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    flexWrap: 'wrap',
+  },
+  highlightMetricItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginRight: 12,
+    marginBottom: 4,
+  },
+  highlightMetricText: {
+    fontSize: 14,
+    color: '#fff',
+    marginLeft: 4,
+    textShadowColor: 'rgba(0,0,0,0.5)',
+    textShadowOffset: {width: 0, height: 1},
+    textShadowRadius: 2,
+  },
+  
+  // Categories Tabs - Professional
+  categoriesContainer: {
+    marginTop: 8,
+    marginBottom: 16,
+  },
+  categoriesScrollContent: {
+    paddingHorizontal: 16,
+    paddingBottom: 4,
+  },
+  categoryTab: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 8,
+    paddingHorizontal: 14,
+    borderRadius: 50,
+    backgroundColor: '#f0f0f0',
+    marginRight: 10,
+    borderWidth: 1,
+    borderColor: '#e0e0e0',
+    elevation: 1,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.05,
+    shadowRadius: 1,
+  },
+  categoryTabActive: {
+    backgroundColor: '#FFF0E8', // Very light orange
+    borderColor: '#FC5200', // Strava orange
+  },
+  categoryTabText: {
+    marginLeft: 8,
+    fontSize: 14,
+    color: '#555',
+    fontWeight: '500',
+  },
+  categoryTabTextActive: {
+    color: '#FC5200', // Strava orange
+    fontWeight: 'bold',
+  },
+  
+  // Featured Trails Grid - Professional
+  featuredTrailsSection: {
+    marginHorizontal: 16,
+    marginBottom: 24,
+  },
+  featuredTrailsHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
     marginBottom: 12,
   },
-  spotlightTitle: {
-    color: '#fff',
-    fontSize: 24,
+  featuredHeaderLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  featuredHeaderIcon: {
+    marginRight: 8,
+  },
+  featuredTrailsTitle: {
+    fontSize: 18,
     fontWeight: 'bold',
-    flex: 1,
-    textShadowColor: 'rgba(0,0,0,0.75)',
+    color: '#333',
+  },
+  viewAllButton: {
+    marginRight: -8,
+  },
+  viewAllButtonLabel: {
+    fontSize: 14,
+    color: '#FC5200', // Strava orange
+    fontWeight: '500',
+  },
+  trailCardsContainer: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    justifyContent: 'space-between',
+  },
+  trailCardWrapper: {
+    width: '48%',
+    marginBottom: 16,
+  },
+  trailCard: {
+    borderRadius: 12,
+    overflow: 'hidden',
+    height: 180,
+    backgroundColor: '#fff',
+    elevation: 3,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.1,
+    shadowRadius: 2,
+  },
+  trailCardImage: {
+    height: '100%',
+    width: '100%',
+  },
+  trailCardOverlay: {
+    ...StyleSheet.absoluteFillObject,
+    justifyContent: 'space-between',
+  },
+  trailCardHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    padding: 10,
+  },
+  difficultyChip: {
+    height: 24,
+  },
+  easyChip: {
+    backgroundColor: 'rgba(198, 246, 213, 0.9)',
+  },
+  moderateChip: {
+    backgroundColor: 'rgba(254, 235, 200, 0.9)',
+  },
+  difficultChip: {
+    backgroundColor: 'rgba(254, 215, 215, 0.9)',
+  },
+  difficultyChipText: {
+    fontSize: 10,
+    fontWeight: 'bold',
+  },
+  ratingBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: 'rgba(0,0,0,0.6)',
+    paddingHorizontal: 6,
+    paddingVertical: 3,
+    borderRadius: 12,
+  },
+  ratingText: {
+    color: '#fff',
+    fontSize: 12,
+    fontWeight: 'bold',
+    marginLeft: 3,
+  },
+  trailCardContent: {
+    padding: 12,
+  },
+  trailCardName: {
+    fontSize: 16,
+    fontWeight: 'bold',
+    color: '#fff',
+    marginBottom: 6,
+    textShadowColor: 'rgba(0,0,0,0.5)',
     textShadowOffset: {width: 0, height: 1},
     textShadowRadius: 2,
   },
+  trailCardDetails: {},
+  trailCardDetailItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 4,
+  },
+  trailCardDetailRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+  },
+  trailCardDetailText: {
+    color: '#fff',
+    fontSize: 12,
+    marginLeft: 4,
+    textShadowColor: 'rgba(0,0,0,0.5)',
+    textShadowOffset: {width: 0, height: 1},
+    textShadowRadius: 2,
+  },
+  // Empty state styling
+  emptyStateContainer: {
+    width: '100%',
+    padding: 20,
+    borderRadius: 12,
+    backgroundColor: '#fff',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginTop: 10,
+  },
+  noTrailsText: {
+    textAlign: 'center',
+    color: '#666',
+    marginTop: 12,
+    fontSize: 16,
+    fontWeight: '500',
+  },
+  noTrailsSubtext: {
+    textAlign: 'center',
+    color: '#999',
+    marginTop: 4,
+    fontSize: 14,
+  },
+  
+  // Cebu Facts Card - Professional
+  factCard: {
+    margin: 16,
+    padding: 16,
+    borderRadius: 14,
+    backgroundColor: '#fff',
+    marginBottom: 32,
+    elevation: 3,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.1,
+    shadowRadius: 3,
+  },
+  factCardHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 12,
+  },
+  factHeaderLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  factCardTitle: {
+    fontSize: 16,
+    fontWeight: 'bold',
+    color: '#333',
+    marginLeft: 8,
+  },
+  factChip: {
+    backgroundColor: '#E3F2FD',
+    height: 28,
+  },
+  factDivider: {
+    height: 1,
+    backgroundColor: '#f0f0f0',
+    marginBottom: 12,
+  },
+  factCardText: {
+    fontSize: 14,
+    lineHeight: 22,
+    color: '#555',
+  },
+  
+  // Other styles
   difficultyBadge: {
-    paddingHorizontal: 10,
+    paddingHorizontal: 8,
     paddingVertical: 4,
     borderRadius: 4,
   },
   easyBadge: {
-    backgroundColor: '#c6f6d5',
+    backgroundColor: 'rgba(198, 246, 213, 0.9)',
   },
   moderateBadge: {
-    backgroundColor: '#feebc8',
+    backgroundColor: 'rgba(254, 235, 200, 0.9)',
   },
   difficultBadge: {
-    backgroundColor: '#fed7d7',
+    backgroundColor: 'rgba(254, 215, 215, 0.9)',
   },
   difficultyText: {
     fontSize: 12,
     fontWeight: 'bold',
     color: '#333',
   },
-  spotlightDetails: {
-    marginBottom: 16,
-  },
-  spotlightDetail: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: 8,
-  },
-  spotlightDetailText: {
-    color: '#fff',
-    marginLeft: 8,
-    fontSize: 14,
-    textShadowColor: 'rgba(0,0,0,0.75)',
-    textShadowOffset: {width: 0, height: 1},
-    textShadowRadius: 2,
-  },
-  spotlightDescription: {
-    color: '#fff', 
-    marginBottom: 16,
-    fontSize: 14,
-    lineHeight: 20,
-    textShadowColor: 'rgba(0,0,0,0.75)',
-    textShadowOffset: {width: 0, height: 1},
-    textShadowRadius: 2,
-  },
-  spotlightButton: {
-    borderRadius: 30,
-  },
-  // More Trails Section - With Custom Cards
-  moreTrailsContainer: {
-    marginHorizontal: 16,
-    marginTop: 32,
-    marginBottom: 16,
-  },
-  viewAllButton: {
-    marginRight: -8,
-  },
-  customTrailsGrid: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    justifyContent: 'space-between',
-    marginTop: 8,
-  },
-  // Custom Trail Card Styles
-  customTrailCard: {
-    width: '48%', // Almost half width to fit two cards per row with spacing
-    marginBottom: 16,
-    borderRadius: 12,
-    overflow: 'hidden',
-    elevation: 3,
-  },
-  customTrailImage: {
-    width: '100%',
-    height: 140,
-  },
-  customTrailContent: {
-    padding: 12,
-  },
-  customTrailTitle: {
-    fontSize: 16,
-    fontWeight: 'bold',
-    marginBottom: 8,
-  },
-  customTrailInfoRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: 8,
-    justifyContent: 'space-between',
-  },
-  customTrailInfoText: {
-    marginLeft: 6,
-    fontSize: 12,
-    color: '#666',
-    flex: 1,
-  },
-  trailMetaContainer: {
-    flexDirection: 'column',
-    alignItems: 'flex-start',
-  },
-  metaItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: 4,
-  },
-  metaText: {
-    marginLeft: 4,
-    fontSize: 11,
-    color: '#666',
-  },
-  // Admin Button
   adminButton: {
     marginHorizontal: 16,
     marginBottom: 80,
-    marginTop: 20,
+    borderRadius: 8,
+    borderColor: '#FC5200',
+    borderWidth: 1.5,
   },
-  // FAB
   fab: {
     position: 'absolute',
     margin: 16,
     right: 0,
     bottom: 0,
-    borderRadius: 28,
-  },
+    backgroundColor: '#FC5200', // Strava orange
+    elevation: 4,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.3,
+    shadowRadius: 3,
+  }
 });
 
 export default HomeScreen;
