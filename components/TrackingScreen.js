@@ -5,6 +5,7 @@ import * as Location from 'expo-location';
 import MapView, { Polyline, Marker } from 'react-native-maps';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 const { width, height } = Dimensions.get('window');
 
@@ -151,6 +152,23 @@ const TrackingScreen = ({ setActiveScreen, currentTrail }) => {
     // Calculate final stats
     const duration = formatDuration(startTime, new Date());
     const distance = distanceTraveled.toFixed(2);
+    const endTime = new Date();
+    
+    // Prepare activity data
+    const activityData = {
+      id: Date.now().toString(), // Simple unique ID
+      date: endTime.toISOString(),
+      trailName: currentTrail ? currentTrail.name : 'Custom Hike',
+      trailId: currentTrail ? currentTrail.id : null,
+      distance: parseFloat(distance),
+      duration: duration,
+      durationMs: endTime - startTime,
+      startTime: startTime.toISOString(),
+      endTime: endTime.toISOString(),
+      routeCoordinates: routeCoordinates,
+      averagePace: formatPace(),
+      maxElevation: location ? Math.round(location.coords.altitude || 0) : 0,
+    };
     
     // Show completion dialog
     Alert.alert(
@@ -160,9 +178,9 @@ const TrackingScreen = ({ setActiveScreen, currentTrail }) => {
         {
           text: "Save Activity",
           onPress: () => {
-            // Here you would save the activity to your database
-            // For now we'll just go back to home
-            Alert.alert("Success", "Your hike was saved!");
+            // Save the activity to storage
+            saveActivityToHistory(activityData);
+            Alert.alert("Success", "Your hike was saved to your history!");
             setActiveScreen('Home');
           }
         },
@@ -173,6 +191,26 @@ const TrackingScreen = ({ setActiveScreen, currentTrail }) => {
         }
       ]
     );
+  };
+
+  // Function to save activity to history
+  const saveActivityToHistory = async (activityData) => {
+    try {
+      // Get existing history from AsyncStorage
+      const existingHistoryJSON = await AsyncStorage.getItem('hikeHistory');
+      let hikeHistory = existingHistoryJSON ? JSON.parse(existingHistoryJSON) : [];
+      
+      // Add new activity to history array
+      hikeHistory.unshift(activityData); // Add to the beginning of the array
+      
+      // Save updated history back to AsyncStorage
+      await AsyncStorage.setItem('hikeHistory', JSON.stringify(hikeHistory));
+      
+      console.log('Activity saved to history:', activityData.id);
+    } catch (error) {
+      console.error('Error saving activity to history:', error);
+      Alert.alert('Error', 'Failed to save your activity. Please try again.');
+    }
   };
 
   // Calculate distance between two coordinates using Haversine formula
