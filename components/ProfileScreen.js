@@ -9,7 +9,8 @@ import {
   TextInput,
   Alert,
   ActivityIndicator,
-  SafeAreaView
+  SafeAreaView,
+  ImageBackground
 } from 'react-native';
 import {
   Surface,
@@ -27,6 +28,7 @@ import {
   Chip
 } from 'react-native-paper';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
+import { LinearGradient } from 'expo-linear-gradient';
 import { auth } from '../firebase/config';
 import {
   updatePassword,
@@ -205,7 +207,7 @@ const ProfileScreen = ({ setActiveScreen }) => {
   if (loading) {
     return (
       <View style={styles.loadingContainer}>
-        <ActivityIndicator size="large" color="#3c6e71" />
+        <ActivityIndicator size="large" color="#FC5200" />
         <Text style={styles.loadingText}>Loading your profile...</Text>
       </View>
     );
@@ -213,14 +215,19 @@ const ProfileScreen = ({ setActiveScreen }) => {
   
   return (
     <SafeAreaView style={styles.container}>
-      <ScrollView>
-        <Surface style={styles.header}>
+      <ScrollView contentContainerStyle={styles.scrollContent}>
+        {/* Header with gradient background */}
+        <LinearGradient
+          colors={['#FC5200', '#FF7E45']}
+          style={styles.headerGradient}
+        >
           <View style={styles.avatarSection}>
             <Avatar.Text
               size={80}
               label={(updatedName || currentUser.email || '?').substring(0, 2).toUpperCase()}
-              backgroundColor="#3c6e71"
+              backgroundColor="rgba(255,255,255,0.25)"
               color="#fff"
+              style={styles.avatar}
             />
             {!isEditingProfile && (
               <View style={styles.headerInfo}>
@@ -228,14 +235,31 @@ const ProfileScreen = ({ setActiveScreen }) => {
                   {userProfile?.displayName || currentUser.displayName || 'Hiker'}
                 </Title>
                 <Caption style={styles.email}>{currentUser.email}</Caption>
-                {userProfile?.bio && (
-                  <Paragraph style={styles.bio}>{userProfile.bio}</Paragraph>
-                )}
               </View>
             )}
           </View>
-          
-          {isEditingProfile ? (
+        </LinearGradient>
+        
+        {/* Profile Bio & Edit Section */}
+        <Surface style={styles.bioSection}>
+          {!isEditingProfile ? (
+            <>
+              {userProfile?.bio ? (
+                <Paragraph style={styles.bio}>{userProfile.bio}</Paragraph>
+              ) : (
+                <Paragraph style={styles.emptyBio}>Add a bio to tell others about yourself</Paragraph>
+              )}
+              <Button
+                mode="outlined"
+                onPress={() => setIsEditingProfile(true)}
+                style={styles.editButton}
+                icon="account-edit"
+                labelStyle={styles.editButtonLabel}
+              >
+                Edit Profile
+              </Button>
+            </>
+          ) : (
             <View style={styles.editForm}>
               <TextInput
                 style={styles.input}
@@ -256,6 +280,7 @@ const ProfileScreen = ({ setActiveScreen }) => {
                   mode="outlined"
                   onPress={() => setIsEditingProfile(false)}
                   style={styles.cancelButton}
+                  labelStyle={styles.cancelButtonLabel}
                   disabled={saving}
                 >
                   Cancel
@@ -266,23 +291,16 @@ const ProfileScreen = ({ setActiveScreen }) => {
                   loading={saving}
                   disabled={saving}
                   style={styles.saveButton}
+                  labelStyle={styles.saveButtonLabel}
                 >
                   Save
                 </Button>
               </View>
             </View>
-          ) : (
-            <Button
-              mode="outlined"
-              onPress={() => setIsEditingProfile(true)}
-              style={styles.editButton}
-              icon="account-edit"
-            >
-              Edit Profile
-            </Button>
           )}
         </Surface>
         
+        {/* Stats Card */}
         <Surface style={styles.statsCard}>
           <View style={styles.statsRow}>
             <View style={styles.statItem}>
@@ -312,55 +330,61 @@ const ProfileScreen = ({ setActiveScreen }) => {
           </View>
         </Surface>
         
-        <List.Section style={styles.section}>
-          <List.Subheader style={styles.sectionTitle}>Account Settings</List.Subheader>
+        {/* Account Settings Section */}
+        <Text style={styles.sectionTitle}>Account Settings</Text>
+        <Surface style={styles.settingsCard}>
+          <List.Item
+            title="Change Password"
+            description="Update your account password"
+            left={props => <List.Icon {...props} icon="lock-reset" color="#FC5200" />}
+            right={props => <List.Icon {...props} icon="chevron-right" color="#757575" />}
+            onPress={() => setShowPasswordModal(true)}
+            style={styles.listItem}
+            titleStyle={styles.listItemTitle}
+            descriptionStyle={styles.listItemDescription}
+          />
           
-          <Surface style={styles.settingsCard}>
-            <List.Item
-              title="Change Password"
-              description="Update your account password"
-              left={props => <List.Icon {...props} icon="lock-reset" color="#3c6e71" />}
-              right={props => <List.Icon {...props} icon="chevron-right" />}
-              onPress={() => setShowPasswordModal(true)}
-              style={styles.listItem}
-            />
-            
-            <Divider />
-            
-            <List.Item
-              title="Notification Preferences"
-              description="Manage your notification settings"
-              left={props => <List.Icon {...props} icon="bell-outline" color="#3c6e71" />}
-              right={props => <List.Icon {...props} icon="chevron-right" />}
-              style={styles.listItem}
-            />
-            
-            <Divider />
-            
-            <List.Item
-              title="Privacy Settings"
-              description="Control your privacy options"
-              left={props => <List.Icon {...props} icon="shield-account" color="#3c6e71" />}
-              right={props => <List.Icon {...props} icon="chevron-right" />}
-              style={styles.listItem}
-            />
-            
-            <Divider />
-            
-            <List.Item
-              title="Sign Out"
-              description="Log out from your account"
-              left={props => <List.Icon {...props} icon="logout" color="#e53e3e" />}
-              onPress={() => signOut(auth)}
-              style={styles.listItem}
-            />
-          </Surface>
-        </List.Section>
+          <Divider style={styles.divider} />
+          
+          <List.Item
+            title="Notification Preferences"
+            description="Manage your notification settings"
+            left={props => <List.Icon {...props} icon="bell-outline" color="#FC5200" />}
+            right={props => <List.Icon {...props} icon="chevron-right" color="#757575" />}
+            style={styles.listItem}
+            titleStyle={styles.listItemTitle}
+            descriptionStyle={styles.listItemDescription}
+          />
+          
+          <Divider style={styles.divider} />
+          
+          <List.Item
+            title="Privacy Settings"
+            description="Control your privacy options"
+            left={props => <List.Icon {...props} icon="shield-account" color="#FC5200" />}
+            right={props => <List.Icon {...props} icon="chevron-right" color="#757575" />}
+            style={styles.listItem}
+            titleStyle={styles.listItemTitle}
+            descriptionStyle={styles.listItemDescription}
+          />
+          
+          <Divider style={styles.divider} />
+          
+          <List.Item
+            title="Sign Out"
+            description="Log out from your account"
+            left={props => <List.Icon {...props} icon="logout" color="#E53935" />}
+            onPress={() => signOut(auth)}
+            style={styles.listItem}
+            titleStyle={styles.listItemTitle}
+            descriptionStyle={styles.listItemDescription}
+          />
+        </Surface>
         
+        {/* Favorite Trails Section */}
         {favoriteTrails.length > 0 && (
-          <List.Section style={styles.section}>
-            <List.Subheader style={styles.sectionTitle}>Favorite Trails</List.Subheader>
-            
+          <>
+            <Text style={styles.sectionTitle}>Favorite Trails</Text>
             <View style={styles.favoritesList}>
               {favoriteTrails.map(trail => (
                 <Card
@@ -374,22 +398,50 @@ const ProfileScreen = ({ setActiveScreen }) => {
                   />
                   <Card.Title
                     title={trail.name}
+                    titleStyle={styles.cardTitle}
                     subtitle={trail.location}
+                    subtitleStyle={styles.cardSubtitle}
                     right={(props) => (
-                      <View style={[
-                        styles.difficultyBadge,
-                        trail.difficulty.toLowerCase() === 'easy' ? styles.easyBadge :
-                        trail.difficulty.toLowerCase() === 'moderate' ? styles.moderateBadge :
-                        styles.hardBadge
-                      ]}>
-                        <Text style={styles.difficultyText}>{trail.difficulty}</Text>
+                      <View style={styles.cardRight}>
+                        <View style={[
+                          styles.difficultyBadge,
+                          trail.difficulty.toLowerCase() === 'easy' ? styles.easyBadge :
+                          trail.difficulty.toLowerCase() === 'moderate' ? styles.moderateBadge :
+                          styles.hardBadge
+                        ]}>
+                          <Text style={styles.difficultyText}>{trail.difficulty}</Text>
+                        </View>
+                        <View style={styles.ratingContainer}>
+                          <MaterialCommunityIcons name="star" size={14} color="#FC5200" />
+                          <Text style={styles.ratingText}>
+                            {trail.averageRating ? trail.averageRating.toFixed(1) : '0.0'}
+                          </Text>
+                        </View>
                       </View>
                     )}
                   />
+                  <Card.Actions style={styles.cardActions}>
+                    <Button 
+                      mode="text" 
+                      onPress={() => handleViewTrail(trail.id)}
+                      color="#FC5200"
+                      labelStyle={styles.viewDetailsLabel}
+                    >
+                      View Details
+                    </Button>
+                    <Button 
+                      mode="contained" 
+                      onPress={() => setActiveScreen('Tracking')}
+                      style={styles.hikeButton}
+                      labelStyle={styles.hikeButtonLabel}
+                    >
+                      Start Hike
+                    </Button>
+                  </Card.Actions>
                 </Card>
               ))}
             </View>
-          </List.Section>
+          </>
         )}
         
         {/* Password Change Modal */}
@@ -399,7 +451,7 @@ const ProfileScreen = ({ setActiveScreen }) => {
             onDismiss={() => setShowPasswordModal(false)}
             style={styles.dialog}
           >
-            <Dialog.Title>Change Password</Dialog.Title>
+            <Dialog.Title style={styles.dialogTitle}>Change Password</Dialog.Title>
             <Dialog.Content>
               <TextInput
                 style={styles.passwordInput}
@@ -430,6 +482,7 @@ const ProfileScreen = ({ setActiveScreen }) => {
               <Button
                 onPress={() => setShowPasswordModal(false)}
                 disabled={changingPassword}
+                color="#757575"
               >
                 Cancel
               </Button>
@@ -438,6 +491,8 @@ const ProfileScreen = ({ setActiveScreen }) => {
                 onPress={handleChangePassword}
                 loading={changingPassword}
                 disabled={changingPassword}
+                style={styles.updatePasswordButton}
+                labelStyle={styles.updatePasswordLabel}
               >
                 Update
               </Button>
@@ -445,6 +500,8 @@ const ProfileScreen = ({ setActiveScreen }) => {
           </Dialog>
         </Portal>
       </ScrollView>
+      
+      {/* Bottom Nav Bar */}
       <BottomNavBar activeScreen="Profile" setActiveScreen={setActiveScreen} />
     </SafeAreaView>
   );
@@ -454,7 +511,9 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: '#f8f9fa',
-    paddingBottom: 60, // Add padding for nav bar
+  },
+  scrollContent: {
+    paddingBottom: 90, // Space for bottom nav
   },
   loadingContainer: {
     flex: 1,
@@ -466,50 +525,85 @@ const styles = StyleSheet.create({
     fontSize: 16,
     color: '#666',
   },
-  header: {
-    backgroundColor: '#fff',
-    padding: 20,
-    marginBottom: 16,
-    elevation: 2,
+  
+  // Header with gradient
+  headerGradient: {
+    padding: 24,
+    paddingTop: 40,
+    paddingBottom: 30,
   },
   avatarSection: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: 16,
+  },
+  avatar: {
+    elevation: 4,
+    shadowColor: 'rgba(0,0,0,0.3)',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.3,
+    shadowRadius: 4,
   },
   headerInfo: {
-    marginLeft: 16,
+    marginLeft: 20,
     flex: 1,
   },
   name: {
-    fontSize: 22,
+    fontSize: 24,
     fontWeight: 'bold',
-    color: '#333',
+    color: '#fff',
+    textShadowColor: 'rgba(0,0,0,0.1)',
+    textShadowOffset: { width: 0, height: 1 },
+    textShadowRadius: 2,
   },
   email: {
     fontSize: 14,
-    color: '#666',
+    color: 'rgba(255,255,255,0.9)',
     marginTop: 2,
   },
+  
+  // Bio section
+  bioSection: {
+    marginHorizontal: 16,
+    marginTop: -20,
+    padding: 20,
+    borderRadius: 12,
+    elevation: 3,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.2,
+    shadowRadius: 2,
+  },
   bio: {
-    fontSize: 14,
-    color: '#666',
-    marginTop: 8,
-    lineHeight: 20,
+    fontSize: 15,
+    color: '#333',
+    lineHeight: 22,
+    marginBottom: 16,
+  },
+  emptyBio: {
+    fontSize: 15,
+    color: '#999',
+    fontStyle: 'italic',
+    marginBottom: 16,
   },
   editButton: {
-    marginTop: 8,
     alignSelf: 'flex-start',
-    borderColor: '#3c6e71',
+    borderColor: '#FC5200',
     borderWidth: 1,
   },
+  editButtonLabel: {
+    color: '#FC5200',
+    fontSize: 13,
+    fontWeight: '500',
+  },
+  
+  // Edit form
   editForm: {
-    marginTop: 16,
+    width: '100%',
   },
   input: {
     backgroundColor: '#f9f9f9',
     borderWidth: 1,
-    borderColor: '#ddd',
+    borderColor: '#e0e0e0',
     borderRadius: 8,
     padding: 12,
     fontSize: 16,
@@ -525,16 +619,27 @@ const styles = StyleSheet.create({
     marginTop: 8,
   },
   cancelButton: {
-    marginRight: 8,
+    marginRight: 12,
+    borderColor: '#ccc',
+  },
+  cancelButtonLabel: {
+    color: '#666',
   },
   saveButton: {
-    backgroundColor: '#3c6e71',
+    backgroundColor: '#FC5200',
   },
+  saveButtonLabel: {
+    color: '#fff',
+    fontWeight: '500',
+  },
+  
+  // Stats card
   statsCard: {
     marginHorizontal: 16,
-    marginBottom: 16,
+    marginTop: 16,
+    marginBottom: 24,
     padding: 16,
-    borderRadius: 8,
+    borderRadius: 12,
     elevation: 2,
   },
   statsRow: {
@@ -549,30 +654,33 @@ const styles = StyleSheet.create({
   statDivider: {
     width: 1,
     height: 40,
-    backgroundColor: '#ddd',
+    backgroundColor: '#e0e0e0',
   },
   statNumber: {
     fontSize: 22,
     fontWeight: 'bold',
-    color: '#3c6e71',
+    color: '#FC5200',
     marginBottom: 4,
   },
   statLabel: {
     fontSize: 12,
     color: '#666',
   },
-  section: {
-    marginBottom: 16,
-  },
+  
+  // Section titles
   sectionTitle: {
     fontSize: 18,
     fontWeight: 'bold',
     color: '#333',
     marginLeft: 16,
+    marginTop: 24,
+    marginBottom: 12,
   },
+  
+  // Settings card
   settingsCard: {
     marginHorizontal: 16,
-    borderRadius: 8,
+    borderRadius: 12,
     overflow: 'hidden',
     elevation: 2,
   },
@@ -580,23 +688,51 @@ const styles = StyleSheet.create({
     padding: 8,
     backgroundColor: '#fff',
   },
+  listItemTitle: {
+    fontSize: 16,
+    color: '#333',
+    fontWeight: '500',
+  },
+  listItemDescription: {
+    fontSize: 13,
+    color: '#777',
+  },
+  divider: {
+    height: 1,
+    backgroundColor: '#f0f0f0',
+  },
+  
+  // Favorites section
   favoritesList: {
-    marginHorizontal: 16,
+    paddingHorizontal: 16,
   },
   favoriteCard: {
-    marginBottom: 12,
-    borderRadius: 8,
+    marginBottom: 16,
+    borderRadius: 12,
     overflow: 'hidden',
     elevation: 2,
   },
   favoriteImage: {
-    height: 120,
+    height: 140,
+  },
+  cardTitle: {
+    fontSize: 16,
+    fontWeight: 'bold',
+    color: '#333',
+  },
+  cardSubtitle: {
+    fontSize: 13,
+    color: '#666',
+  },
+  cardRight: {
+    alignItems: 'flex-end',
   },
   difficultyBadge: {
-    paddingHorizontal: 10,
-    paddingVertical: 4,
+    paddingHorizontal: 8,
+    paddingVertical: 3,
     borderRadius: 4,
     marginRight: 16,
+    marginBottom: 4,
   },
   easyBadge: {
     backgroundColor: '#c6f6d5',
@@ -608,28 +744,67 @@ const styles = StyleSheet.create({
     backgroundColor: '#fed7d7',
   },
   difficultyText: {
-    fontSize: 12,
+    fontSize: 11,
     fontWeight: 'bold',
     color: '#333',
   },
+  ratingContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginRight: 16,
+  },
+  ratingText: {
+    fontSize: 12,
+    fontWeight: 'bold',
+    color: '#333',
+    marginLeft: 4,
+  },
+  cardActions: {
+    justifyContent: 'space-between',
+    borderTopWidth: 1,
+    borderTopColor: '#f0f0f0',
+  },
+  viewDetailsLabel: {
+    fontSize: 12,
+    color: '#FC5200',
+  },
+  hikeButton: {
+    backgroundColor: '#FC5200',
+  },
+  hikeButtonLabel: {
+    fontSize: 12,
+    color: '#fff',
+  },
+  
+  // Password dialog
   dialog: {
-    borderRadius: 12,
+    borderRadius: 16,
     backgroundColor: '#fff',
+  },
+  dialogTitle: {
+    color: '#333',
+    fontWeight: 'bold',
   },
   passwordInput: {
     backgroundColor: '#f9f9f9',
     borderWidth: 1,
-    borderColor: '#ddd',
+    borderColor: '#e0e0e0',
     borderRadius: 8,
     padding: 12,
     fontSize: 16,
     marginBottom: 12,
   },
   errorText: {
-    color: '#e53e3e',
+    color: '#E53935',
     marginTop: 8,
     fontSize: 14,
   },
+  updatePasswordButton: {
+    backgroundColor: '#FC5200',
+  },
+  updatePasswordLabel: {
+    color: '#fff',
+  }
 });
 
 export default ProfileScreen;
