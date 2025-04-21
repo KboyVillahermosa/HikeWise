@@ -1,4 +1,4 @@
-package com.yourcompany.cebuhikingspots
+package com.yourcompany.yourapp
 
 import android.os.Build
 import android.os.Bundle

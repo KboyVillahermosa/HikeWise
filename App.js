@@ -27,7 +27,7 @@ const theme = {
 };
 
 export default function App() {
-  const [activeScreen, setActiveScreen] = useState('Home');
+  const [activeScreen, setActiveScreen] = useState('Login');
   const [user, setUser] = useState(null);
   const [initializing, setInitializing] = useState(true);
   const [selectedTrailId, setSelectedTrailId] = useState(null);
