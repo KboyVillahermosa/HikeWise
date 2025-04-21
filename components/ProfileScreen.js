@@ -8,7 +8,8 @@ import {
   Image,
   TextInput,
   Alert,
-  ActivityIndicator
+  ActivityIndicator,
+  SafeAreaView
 } from 'react-native';
 import {
   Surface,
@@ -38,6 +39,7 @@ import {
   updateUserProfile,
   getTrailsById
 } from '../firebase/firestoreService';
+import BottomNavBar from './BottomNavBar';
 
 const ProfileScreen = ({ setActiveScreen }) => {
   const currentUser = auth.currentUser;
@@ -210,245 +212,249 @@ const ProfileScreen = ({ setActiveScreen }) => {
   }
   
   return (
-    <ScrollView style={styles.container}>
-      <Surface style={styles.header}>
-        <View style={styles.avatarSection}>
-          <Avatar.Text
-            size={80}
-            label={(updatedName || currentUser.email || '?').substring(0, 2).toUpperCase()}
-            backgroundColor="#3c6e71"
-            color="#fff"
-          />
-          {!isEditingProfile && (
-            <View style={styles.headerInfo}>
-              <Title style={styles.name}>
-                {userProfile?.displayName || currentUser.displayName || 'Hiker'}
-              </Title>
-              <Caption style={styles.email}>{currentUser.email}</Caption>
-              {userProfile?.bio && (
-                <Paragraph style={styles.bio}>{userProfile.bio}</Paragraph>
-              )}
+    <SafeAreaView style={styles.container}>
+      <ScrollView>
+        <Surface style={styles.header}>
+          <View style={styles.avatarSection}>
+            <Avatar.Text
+              size={80}
+              label={(updatedName || currentUser.email || '?').substring(0, 2).toUpperCase()}
+              backgroundColor="#3c6e71"
+              color="#fff"
+            />
+            {!isEditingProfile && (
+              <View style={styles.headerInfo}>
+                <Title style={styles.name}>
+                  {userProfile?.displayName || currentUser.displayName || 'Hiker'}
+                </Title>
+                <Caption style={styles.email}>{currentUser.email}</Caption>
+                {userProfile?.bio && (
+                  <Paragraph style={styles.bio}>{userProfile.bio}</Paragraph>
+                )}
+              </View>
+            )}
+          </View>
+          
+          {isEditingProfile ? (
+            <View style={styles.editForm}>
+              <TextInput
+                style={styles.input}
+                placeholder="Display Name"
+                value={updatedName}
+                onChangeText={setUpdatedName}
+              />
+              <TextInput
+                style={[styles.input, styles.bioInput]}
+                placeholder="About me (optional)"
+                value={updatedBio}
+                onChangeText={setUpdatedBio}
+                multiline
+                numberOfLines={3}
+              />
+              <View style={styles.editButtons}>
+                <Button
+                  mode="outlined"
+                  onPress={() => setIsEditingProfile(false)}
+                  style={styles.cancelButton}
+                  disabled={saving}
+                >
+                  Cancel
+                </Button>
+                <Button
+                  mode="contained"
+                  onPress={handleUpdateProfile}
+                  loading={saving}
+                  disabled={saving}
+                  style={styles.saveButton}
+                >
+                  Save
+                </Button>
+              </View>
             </View>
+          ) : (
+            <Button
+              mode="outlined"
+              onPress={() => setIsEditingProfile(true)}
+              style={styles.editButton}
+              icon="account-edit"
+            >
+              Edit Profile
+            </Button>
           )}
-        </View>
+        </Surface>
         
-        {isEditingProfile ? (
-          <View style={styles.editForm}>
-            <TextInput
-              style={styles.input}
-              placeholder="Display Name"
-              value={updatedName}
-              onChangeText={setUpdatedName}
+        <Surface style={styles.statsCard}>
+          <View style={styles.statsRow}>
+            <View style={styles.statItem}>
+              <Text style={styles.statNumber}>
+                {userProfile?.favoriteTrails?.length || 0}
+              </Text>
+              <Text style={styles.statLabel}>Favorite Trails</Text>
+            </View>
+            
+            <View style={styles.statDivider} />
+            
+            <View style={styles.statItem}>
+              <Text style={styles.statNumber}>
+                {userProfile?.completedTrails?.length || 0}
+              </Text>
+              <Text style={styles.statLabel}>Completed</Text>
+            </View>
+            
+            <View style={styles.statDivider} />
+            
+            <View style={styles.statItem}>
+              <Text style={styles.statNumber}>
+                {userProfile?.ratings?.length || 0}
+              </Text>
+              <Text style={styles.statLabel}>Reviews</Text>
+            </View>
+          </View>
+        </Surface>
+        
+        <List.Section style={styles.section}>
+          <List.Subheader style={styles.sectionTitle}>Account Settings</List.Subheader>
+          
+          <Surface style={styles.settingsCard}>
+            <List.Item
+              title="Change Password"
+              description="Update your account password"
+              left={props => <List.Icon {...props} icon="lock-reset" color="#3c6e71" />}
+              right={props => <List.Icon {...props} icon="chevron-right" />}
+              onPress={() => setShowPasswordModal(true)}
+              style={styles.listItem}
             />
-            <TextInput
-              style={[styles.input, styles.bioInput]}
-              placeholder="About me (optional)"
-              value={updatedBio}
-              onChangeText={setUpdatedBio}
-              multiline
-              numberOfLines={3}
+            
+            <Divider />
+            
+            <List.Item
+              title="Notification Preferences"
+              description="Manage your notification settings"
+              left={props => <List.Icon {...props} icon="bell-outline" color="#3c6e71" />}
+              right={props => <List.Icon {...props} icon="chevron-right" />}
+              style={styles.listItem}
             />
-            <View style={styles.editButtons}>
+            
+            <Divider />
+            
+            <List.Item
+              title="Privacy Settings"
+              description="Control your privacy options"
+              left={props => <List.Icon {...props} icon="shield-account" color="#3c6e71" />}
+              right={props => <List.Icon {...props} icon="chevron-right" />}
+              style={styles.listItem}
+            />
+            
+            <Divider />
+            
+            <List.Item
+              title="Sign Out"
+              description="Log out from your account"
+              left={props => <List.Icon {...props} icon="logout" color="#e53e3e" />}
+              onPress={() => signOut(auth)}
+              style={styles.listItem}
+            />
+          </Surface>
+        </List.Section>
+        
+        {favoriteTrails.length > 0 && (
+          <List.Section style={styles.section}>
+            <List.Subheader style={styles.sectionTitle}>Favorite Trails</List.Subheader>
+            
+            <View style={styles.favoritesList}>
+              {favoriteTrails.map(trail => (
+                <Card
+                  key={trail.id}
+                  style={styles.favoriteCard}
+                  onPress={() => handleViewTrail(trail.id)}
+                >
+                  <Card.Cover
+                    source={{ uri: trail.imageUrl || 'https://via.placeholder.com/400x200?text=No+Image' }}
+                    style={styles.favoriteImage}
+                  />
+                  <Card.Title
+                    title={trail.name}
+                    subtitle={trail.location}
+                    right={(props) => (
+                      <View style={[
+                        styles.difficultyBadge,
+                        trail.difficulty.toLowerCase() === 'easy' ? styles.easyBadge :
+                        trail.difficulty.toLowerCase() === 'moderate' ? styles.moderateBadge :
+                        styles.hardBadge
+                      ]}>
+                        <Text style={styles.difficultyText}>{trail.difficulty}</Text>
+                      </View>
+                    )}
+                  />
+                </Card>
+              ))}
+            </View>
+          </List.Section>
+        )}
+        
+        {/* Password Change Modal */}
+        <Portal>
+          <Dialog
+            visible={showPasswordModal}
+            onDismiss={() => setShowPasswordModal(false)}
+            style={styles.dialog}
+          >
+            <Dialog.Title>Change Password</Dialog.Title>
+            <Dialog.Content>
+              <TextInput
+                style={styles.passwordInput}
+                placeholder="Current Password"
+                value={currentPassword}
+                onChangeText={setCurrentPassword}
+                secureTextEntry
+              />
+              <TextInput
+                style={styles.passwordInput}
+                placeholder="New Password"
+                value={newPassword}
+                onChangeText={setNewPassword}
+                secureTextEntry
+              />
+              <TextInput
+                style={styles.passwordInput}
+                placeholder="Confirm New Password"
+                value={confirmPassword}
+                onChangeText={setConfirmPassword}
+                secureTextEntry
+              />
+              {passwordError ? (
+                <Text style={styles.errorText}>{passwordError}</Text>
+              ) : null}
+            </Dialog.Content>
+            <Dialog.Actions>
               <Button
-                mode="outlined"
-                onPress={() => setIsEditingProfile(false)}
-                style={styles.cancelButton}
-                disabled={saving}
+                onPress={() => setShowPasswordModal(false)}
+                disabled={changingPassword}
               >
                 Cancel
               </Button>
               <Button
                 mode="contained"
-                onPress={handleUpdateProfile}
-                loading={saving}
-                disabled={saving}
-                style={styles.saveButton}
+                onPress={handleChangePassword}
+                loading={changingPassword}
+                disabled={changingPassword}
               >
-                Save
+                Update
               </Button>
-            </View>
-          </View>
-        ) : (
-          <Button
-            mode="outlined"
-            onPress={() => setIsEditingProfile(true)}
-            style={styles.editButton}
-            icon="account-edit"
-          >
-            Edit Profile
-          </Button>
-        )}
-      </Surface>
-      
-      <Surface style={styles.statsCard}>
-        <View style={styles.statsRow}>
-          <View style={styles.statItem}>
-            <Text style={styles.statNumber}>
-              {userProfile?.favoriteTrails?.length || 0}
-            </Text>
-            <Text style={styles.statLabel}>Favorite Trails</Text>
-          </View>
-          
-          <View style={styles.statDivider} />
-          
-          <View style={styles.statItem}>
-            <Text style={styles.statNumber}>
-              {userProfile?.completedTrails?.length || 0}
-            </Text>
-            <Text style={styles.statLabel}>Completed</Text>
-          </View>
-          
-          <View style={styles.statDivider} />
-          
-          <View style={styles.statItem}>
-            <Text style={styles.statNumber}>
-              {userProfile?.ratings?.length || 0}
-            </Text>
-            <Text style={styles.statLabel}>Reviews</Text>
-          </View>
-        </View>
-      </Surface>
-      
-      <List.Section style={styles.section}>
-        <List.Subheader style={styles.sectionTitle}>Account Settings</List.Subheader>
-        
-        <Surface style={styles.settingsCard}>
-          <List.Item
-            title="Change Password"
-            description="Update your account password"
-            left={props => <List.Icon {...props} icon="lock-reset" color="#3c6e71" />}
-            right={props => <List.Icon {...props} icon="chevron-right" />}
-            onPress={() => setShowPasswordModal(true)}
-            style={styles.listItem}
-          />
-          
-          <Divider />
-          
-          <List.Item
-            title="Notification Preferences"
-            description="Manage your notification settings"
-            left={props => <List.Icon {...props} icon="bell-outline" color="#3c6e71" />}
-            right={props => <List.Icon {...props} icon="chevron-right" />}
-            style={styles.listItem}
-          />
-          
-          <Divider />
-          
-          <List.Item
-            title="Privacy Settings"
-            description="Control your privacy options"
-            left={props => <List.Icon {...props} icon="shield-account" color="#3c6e71" />}
-            right={props => <List.Icon {...props} icon="chevron-right" />}
-            style={styles.listItem}
-          />
-          
-          <Divider />
-          
-          <List.Item
-            title="Sign Out"
-            description="Log out from your account"
-            left={props => <List.Icon {...props} icon="logout" color="#e53e3e" />}
-            onPress={() => signOut(auth)}
-            style={styles.listItem}
-          />
-        </Surface>
-      </List.Section>
-      
-      {favoriteTrails.length > 0 && (
-        <List.Section style={styles.section}>
-          <List.Subheader style={styles.sectionTitle}>Favorite Trails</List.Subheader>
-          
-          <View style={styles.favoritesList}>
-            {favoriteTrails.map(trail => (
-              <Card
-                key={trail.id}
-                style={styles.favoriteCard}
-                onPress={() => handleViewTrail(trail.id)}
-              >
-                <Card.Cover
-                  source={{ uri: trail.imageUrl || 'https://via.placeholder.com/400x200?text=No+Image' }}
-                  style={styles.favoriteImage}
-                />
-                <Card.Title
-                  title={trail.name}
-                  subtitle={trail.location}
-                  right={(props) => (
-                    <View style={[
-                      styles.difficultyBadge,
-                      trail.difficulty.toLowerCase() === 'easy' ? styles.easyBadge :
-                      trail.difficulty.toLowerCase() === 'moderate' ? styles.moderateBadge :
-                      styles.hardBadge
-                    ]}>
-                      <Text style={styles.difficultyText}>{trail.difficulty}</Text>
-                    </View>
-                  )}
-                />
-              </Card>
-            ))}
-          </View>
-        </List.Section>
-      )}
-      
-      {/* Password Change Modal */}
-      <Portal>
-        <Dialog
-          visible={showPasswordModal}
-          onDismiss={() => setShowPasswordModal(false)}
-          style={styles.dialog}
-        >
-          <Dialog.Title>Change Password</Dialog.Title>
-          <Dialog.Content>
-            <TextInput
-              style={styles.passwordInput}
-              placeholder="Current Password"
-              value={currentPassword}
-              onChangeText={setCurrentPassword}
-              secureTextEntry
-            />
-            <TextInput
-              style={styles.passwordInput}
-              placeholder="New Password"
-              value={newPassword}
-              onChangeText={setNewPassword}
-              secureTextEntry
-            />
-            <TextInput
-              style={styles.passwordInput}
-              placeholder="Confirm New Password"
-              value={confirmPassword}
-              onChangeText={setConfirmPassword}
-              secureTextEntry
-            />
-            {passwordError ? (
-              <Text style={styles.errorText}>{passwordError}</Text>
-            ) : null}
-          </Dialog.Content>
-          <Dialog.Actions>
-            <Button
-              onPress={() => setShowPasswordModal(false)}
-              disabled={changingPassword}
-            >
-              Cancel
-            </Button>
-            <Button
-              mode="contained"
-              onPress={handleChangePassword}
-              loading={changingPassword}
-              disabled={changingPassword}
-            >
-              Update
-            </Button>
-          </Dialog.Actions>
-        </Dialog>
-      </Portal>
-    </ScrollView>
+            </Dialog.Actions>
+          </Dialog>
+        </Portal>
+      </ScrollView>
+      <BottomNavBar activeScreen="Profile" setActiveScreen={setActiveScreen} />
+    </SafeAreaView>
   );
 };
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#f5f5f5',
+    backgroundColor: '#f8f9fa',
+    paddingBottom: 60, // Add padding for nav bar
   },
   loadingContainer: {
     flex: 1,

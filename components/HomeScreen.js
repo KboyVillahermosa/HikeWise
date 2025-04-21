@@ -30,6 +30,7 @@ import { getTrails } from '../firebase/firestoreService';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import BottomNavBar from './BottomNavBar'; // Add this import
 
 // Import local assets for easier management
 const ASSETS = {
@@ -349,14 +350,8 @@ const HomeScreen = ({ setActiveScreen, setSelectedTrailId, setCurrentTrail }) =>
         }
       />
       
-      {/* FAB for starting a new hike */}
-      <FAB
-        style={styles.fab}
-        icon="hiking"
-        color="#fff"
-        small
-        onPress={() => setActiveScreen('Tracking')}
-      />
+      {/* Bottom Navigation Bar - Added */}
+      <BottomNavBar activeScreen="Home" setActiveScreen={setActiveScreen} />
     </SafeAreaView>
   );
 };
@@ -457,7 +452,7 @@ const styles = StyleSheet.create({
   // Trail List
   listContainer: {
     padding: 8,
-    paddingBottom: 70,
+    paddingBottom: 80, // Increased to accommodate bottom nav
   },
   
   // Trail Cards
@@ -612,15 +607,6 @@ const styles = StyleSheet.create({
     marginTop: 8,
     fontSize: 14,
   },
-  
-  // FAB
-  fab: {
-    position: 'absolute',
-    margin: 16,
-    right: 0,
-    bottom: 0,
-    backgroundColor: '#FC5200',
-  }
 });
 
 export default HomeScreen;

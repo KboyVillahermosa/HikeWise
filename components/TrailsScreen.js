@@ -8,6 +8,7 @@ import { getLocalTrails, getLocalTopRatedTrails } from '../data/localTrailsData'
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import StarRating from './StarRating';
 import { Button, Portal, Surface, Title, IconButton, Paragraph, Divider, Chip } from 'react-native-paper';
+import BottomNavBar from './BottomNavBar';
 
 const TrailsScreen = ({ navigation, setActiveScreen, setSelectedTrailId }) => {
   const [trails, setTrails] = useState([]);
@@ -316,12 +317,14 @@ const TrailsScreen = ({ navigation, setActiveScreen, setSelectedTrailId }) => {
         data={filteredTrails}
         keyExtractor={(item) => item.id}
         renderItem={renderTrailItem}
-        contentContainerStyle={styles.trailsList}
+        contentContainerStyle={[styles.trailsList, { paddingBottom: 80 }]}
         showsVerticalScrollIndicator={false}
         ListEmptyComponent={
           <Text style={styles.emptyText}>No trails found. Try a different search.</Text>
         }
       />
+
+      <BottomNavBar activeScreen="Trails" setActiveScreen={setActiveScreen} />
 
       <Portal>
         <Modal

@@ -6,6 +6,7 @@ import MapView, { Polyline, Marker } from 'react-native-maps';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import BottomNavBar from './BottomNavBar';
 
 const { width, height } = Dimensions.get('window');
 
@@ -411,6 +412,7 @@ const TrackingScreen = ({ setActiveScreen, currentTrail }) => {
           </View>
         </>
       )}
+      <BottomNavBar activeScreen="Tracking" setActiveScreen={setActiveScreen} />
     </SafeAreaView>
   );
 };
@@ -418,7 +420,8 @@ const TrackingScreen = ({ setActiveScreen, currentTrail }) => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#f5f5f5',
+    backgroundColor: '#f8f9fa',
+    paddingBottom: 60, // Add padding for the navbar
   },
   header: {
     flexDirection: 'row',
