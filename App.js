@@ -1,9 +1,10 @@
 import { StatusBar } from 'expo-status-bar';
-import { StyleSheet, View, SafeAreaView, Text } from 'react-native';
+import { StyleSheet, View, SafeAreaView, Text, Modal } from 'react-native';
 import React, { useState, useEffect } from 'react';
 import { onAuthStateChanged } from 'firebase/auth';
 import { auth } from './firebase/config';
 import Navbar from './components/Navbar';
+import BottomNavBar from './components/BottomNavBar';
 import HomeScreen from './components/HomeScreen';
 import AboutScreen from './components/AboutScreen';
 import LoginScreen from './components/LoginScreen';
@@ -12,6 +13,7 @@ import TrailsScreen from './components/TrailsScreen';
 import TrailDetailScreen from './components/TrailDetailScreen';
 import ProfileScreen from './components/ProfileScreen';
 import TrackingScreen from './components/TrackingScreen';
+import Post from './components/Post';
 import { Provider as PaperProvider, DefaultTheme } from 'react-native-paper';
 
 const theme = {
@@ -32,6 +34,7 @@ export default function App() {
   const [initializing, setInitializing] = useState(true);
   const [selectedTrailId, setSelectedTrailId] = useState(null);
   const [selectedTrail, setSelectedTrail] = useState(null);
+  const [showPostModal, setShowPostModal] = useState(false);
 
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, (user) => {
@@ -110,6 +113,10 @@ export default function App() {
     }
   };
 
+  const handleCreatePostPress = () => {
+    setShowPostModal(true);
+  };
+
   // Only show navbar if user is logged in
   const showNavbar = user !== null;
 
@@ -127,6 +134,22 @@ export default function App() {
         <View style={styles.content}>
           {renderScreen()}
         </View>
+        <Modal
+          visible={showPostModal}
+          animationType="slide"
+          onRequestClose={() => setShowPostModal(false)}
+        >
+          <View style={{ flex: 1 }}>
+            <Post onClose={() => setShowPostModal(false)} />
+          </View>
+        </Modal>
+        {user && (
+          <BottomNavBar 
+            activeScreen={activeScreen} 
+            setActiveScreen={setActiveScreen} 
+            onCreatePostPress={handleCreatePostPress}
+          />
+        )}
         <StatusBar style="light" />
       </SafeAreaView>
     </PaperProvider>

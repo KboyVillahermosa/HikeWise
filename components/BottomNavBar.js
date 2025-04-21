@@ -5,39 +5,56 @@ import { Surface } from 'react-native-paper';
 
 const { width } = Dimensions.get('window');
 
-const BottomNavBar = ({ activeScreen, setActiveScreen }) => {
+const BottomNavBar = ({ activeScreen, setActiveScreen, onCreatePostPress }) => {
   const navItems = [
     { name: 'Home', icon: 'home', screen: 'Home' },
     { name: 'Trails', icon: 'map', screen: 'Trails' },
+    { name: 'Create', icon: 'plus-circle', screen: 'CreatePost', special: true },
     { name: 'Track', icon: 'hiking', screen: 'Tracking' },
     { name: 'Profile', icon: 'account', screen: 'Profile' },
   ];
+
+  const handleNavPress = (item) => {
+    if (item.screen === 'CreatePost' && onCreatePostPress) {
+      onCreatePostPress();
+    } else {
+      setActiveScreen(item.screen);
+    }
+  };
 
   return (
     <Surface style={styles.container}>
       {navItems.map((item) => (
         <TouchableOpacity
           key={item.name}
-          style={styles.navItem}
-          onPress={() => setActiveScreen(item.screen)}
+          style={[
+            styles.navItem,
+            item.special && styles.specialNavItem
+          ]}
+          onPress={() => handleNavPress(item)}
           activeOpacity={0.7}
         >
-          <View style={styles.iconContainer}>
+          <View style={[
+            styles.iconContainer,
+            item.special && styles.specialIconContainer
+          ]}>
             <MaterialCommunityIcons
               name={item.icon}
-              size={24}
-              color={activeScreen === item.screen ? '#FC5200' : '#757575'}
+              size={item.special ? 32 : 24}
+              color={item.special ? '#FFFFFF' : (activeScreen === item.screen ? '#FC5200' : '#757575')}
             />
-            {activeScreen === item.screen && <View style={styles.activeDot} />}
+            {!item.special && activeScreen === item.screen && <View style={styles.activeDot} />}
           </View>
-          <Text
-            style={[
-              styles.navLabel,
-              activeScreen === item.screen && styles.activeNavLabel,
-            ]}
-          >
-            {item.name}
-          </Text>
+          {!item.special && (
+            <Text
+              style={[
+                styles.navLabel,
+                activeScreen === item.screen && styles.activeNavLabel,
+              ]}
+            >
+              {item.name}
+            </Text>
+          )}
         </TouchableOpacity>
       ))}
     </Surface>
@@ -71,11 +88,26 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     height: '100%',
   },
+  specialNavItem: {
+    flex: 1.2,
+  },
   iconContainer: {
     alignItems: 'center',
     justifyContent: 'center',
     position: 'relative',
     marginBottom: 2,
+  },
+  specialIconContainer: {
+    backgroundColor: '#FC5200',
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    shadowColor: '#FC5200',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.3,
+    shadowRadius: 3,
+    elevation: 5,
+    marginBottom: 0,
   },
   activeDot: {
     position: 'absolute',
